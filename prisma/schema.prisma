@@ -3,8 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
 }
 
 // ============================================================
@@ -31,12 +30,12 @@ model Professor {
 // ============================================================
 
 model Aluno {
-  id         String   @id @default(cuid())
-  nome       String
-  usuario    String   @unique
-  senha      String
-  idade      Int?
-  ativo      Boolean  @default(true)
+  id       String  @id @default(cuid())
+  nome     String
+  usuario  String  @unique
+  senha    String
+  idade    Int?
+  ativo    Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,10 +48,10 @@ model Aluno {
 // ============================================================
 
 model Atividade {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  titulo      String
-  descricao   String?
+  titulo    String
+  descricao String?
 
   professorId String
   professor   Professor @relation(
@@ -98,8 +97,7 @@ model Entrega {
 
   status String @default("ENVIADA")
 
-  nota String?
-
+  nota     String?
   feedback String?
 
   createdAt DateTime @default(now())
