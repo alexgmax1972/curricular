@@ -2,11 +2,11 @@
 // P.A.C.
 // Plataforma de Atividade Curricular
 //
-// src/app/api/entregas/route.ts
+// src/app/api/arquivos/route.ts
 //
-// API DE ENTREGAS DE ATIVIDADES
+// API DE ARQUIVOS
 //
-// Prisma + SQLite
+// Prisma + PostgreSQL
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,119 +14,82 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ============================================================
-// TIPOS
-// ============================================================
-
-type StatusEntrega =
-  | "ENVIADA"
-  | "AVALIADA"
-  | "DEVOLVIDA";
-
-// ============================================================
 // GET
 //
-// GET /api/entregas
+// GET /api/arquivos
 //
 // Filtros:
 //
-// /api/entregas?alunoId=...
-// /api/entregas?atividadeId=...
+// /api/arquivos?atividadeId=...
+// /api/arquivos?entregaId=...
 // ============================================================
 
-export async function GET(
-  request: NextRequest,
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } =
-      new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
-    const atividadeId =
-      searchParams.get("atividadeId");
-
-    const alunoId =
-      searchParams.get("alunoId");
-
-    // ========================================================
-    // FILTROS
-    // ========================================================
+    const atividadeId = searchParams.get("atividadeId");
+    const entregaId = searchParams.get("entregaId");
 
     const where: {
       atividadeId?: string;
-      alunoId?: string;
+      entregaId?: string;
     } = {};
 
     if (atividadeId) {
       where.atividadeId = atividadeId;
     }
 
-    if (alunoId) {
-      where.alunoId = alunoId;
+    if (entregaId) {
+      where.entregaId = entregaId;
     }
 
-    // ========================================================
-    // BUSCAR NO BANCO
-    // ========================================================
+    const arquivos = await prisma.arquivo.findMany({
+      where,
 
-    const entregas =
-      await prisma.entrega.findMany({
-        where,
-
-        include: {
-          aluno: {
-            select: {
-              id: true,
-              nome: true,
-              usuario: true,
-            },
+      include: {
+        atividade: {
+          select: {
+            id: true,
+            titulo: true,
+            disciplina: true,
+            semestre: true,
           },
-
-          atividade: {
-            select: {
-              id: true,
-              titulo: true,
-              descricao: true,
-              disciplina: true,
-              semestre: true,
-              prazo: true,
-            },
-          },
-
-          arquivos: true,
         },
 
-        orderBy: {
-          createdAt: "desc",
+        entrega: {
+          select: {
+            id: true,
+            atividadeId: true,
+            alunoId: true,
+            status: true,
+            nota: true,
+          },
         },
-      });
+      },
 
-    // ========================================================
-    // RESPOSTA
-    // ========================================================
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
     return NextResponse.json(
       {
         sucesso: true,
-
-        total: entregas.length,
-
-        entregas,
+        total: arquivos.length,
+        arquivos,
       },
       {
         status: 200,
       },
     );
   } catch (error) {
-    console.error(
-      "Erro ao buscar entregas:",
-      error,
-    );
+    console.error("Erro ao buscar arquivos:", error);
 
     return NextResponse.json(
       {
         sucesso: false,
-
-        mensagem:
-          "Erro ao buscar entregas.",
+        mensagem: "Erro ao buscar arquivos.",
       },
       {
         status: 500,
@@ -138,66 +101,101 @@ export async function GET(
 // ============================================================
 // POST
 //
-// POST /api/entregas
+// POST /api/arquivos
 //
-// Cria uma nova entrega.
+// Cria o registro do arquivo.
 //
 // JSON:
 //
 // {
+//   "nomeOriginal": "atividade.pdf",
+//   "nomeArquivo": "abc123.pdf",
+//   "caminho": "/uploads/abc123.pdf",
+//   "url": "https://...",
+//   "mimeType": "application/pdf",
+//   "tamanho": 123456,
 //   "atividadeId": "...",
-//   "alunoId": "...",
-//   "arquivoId": "...",
-//   "comentario": "Minha atividade"
+//   "entregaId": "..."
 // }
 // ============================================================
 
-export async function POST(
-  request: NextRequest,
-) {
+export async function POST(request: NextRequest) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
     // ========================================================
     // DADOS
     // ========================================================
 
-    const atividadeId =
-      String(
-        body.atividadeId ?? "",
-      ).trim();
+    const nomeOriginal = String(
+      body.nomeOriginal ?? "",
+    ).trim();
 
-    const alunoId =
-      String(
-        body.alunoId ?? "",
-      ).trim();
+    const nomeArquivo = String(
+      body.nomeArquivo ?? "",
+    ).trim();
 
-    const arquivoId =
-      body.arquivoId
-        ? String(
-            body.arquivoId,
-          ).trim()
+    const caminho = String(
+      body.caminho ?? "",
+    ).trim();
+
+    const url = String(
+      body.url ?? "",
+    ).trim();
+
+    const mimeType =
+      body.mimeType !== undefined &&
+      body.mimeType !== null
+        ? String(body.mimeType).trim()
         : null;
 
-    const comentario =
-      body.comentario
-        ? String(
-            body.comentario,
-          ).trim()
+    let tamanho: number | null = null;
+
+    if (
+      body.tamanho !== undefined &&
+      body.tamanho !== null &&
+      body.tamanho !== ""
+    ) {
+      tamanho = Number(body.tamanho);
+
+      if (!Number.isInteger(tamanho) || tamanho < 0) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "O tamanho do arquivo deve ser um número inteiro maior ou igual a zero.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    const atividadeId =
+      body.atividadeId !== undefined &&
+      body.atividadeId !== null &&
+      String(body.atividadeId).trim() !== ""
+        ? String(body.atividadeId).trim()
+        : null;
+
+    const entregaId =
+      body.entregaId !== undefined &&
+      body.entregaId !== null &&
+      String(body.entregaId).trim() !== ""
+        ? String(body.entregaId).trim()
         : null;
 
     // ========================================================
     // VALIDAÇÃO
     // ========================================================
 
-    if (!atividadeId) {
+    if (!nomeOriginal) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "O atividadeId é obrigatório.",
+            "O nome original do arquivo é obrigatório.",
         },
         {
           status: 400,
@@ -205,13 +203,38 @@ export async function POST(
       );
     }
 
-    if (!alunoId) {
+    if (!nomeArquivo) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "O alunoId é obrigatório.",
+            "O nome do arquivo é obrigatório.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!caminho) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "O caminho do arquivo é obrigatório.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!url) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "A URL do arquivo é obrigatória.",
         },
         {
           status: 400,
@@ -223,207 +246,127 @@ export async function POST(
     // VERIFICAR ATIVIDADE
     // ========================================================
 
-    const atividade =
-      await prisma.atividade.findUnique({
-        where: {
-          id: atividadeId,
-        },
-      });
-
-    if (!atividade) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-
-          mensagem:
-            "Atividade não encontrada.",
-        },
-        {
-          status: 404,
-        },
-      );
-    }
-
-    // ========================================================
-    // VERIFICAR ALUNO
-    // ========================================================
-
-    const aluno =
-      await prisma.aluno.findUnique({
-        where: {
-          id: alunoId,
-        },
-      });
-
-    if (!aluno) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-
-          mensagem:
-            "Aluno não encontrado.",
-        },
-        {
-          status: 404,
-        },
-      );
-    }
-
-    // ========================================================
-    // VERIFICAR SE JÁ ENTREGOU
-    //
-    // O schema possui:
-    //
-    // @@unique([atividadeId, alunoId])
-    // ========================================================
-
-    const entregaExistente =
-      await prisma.entrega.findUnique({
-        where: {
-          atividadeId_alunoId: {
-            atividadeId,
-            alunoId,
-          },
-        },
-
-        include: {
-          arquivos: true,
-        },
-      });
-
-    if (entregaExistente) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-
-          mensagem:
-            "O aluno já possui uma entrega para esta atividade.",
-
-          entrega:
-            entregaExistente,
-        },
-        {
-          status: 409,
-        },
-      );
-    }
-
-    // ========================================================
-    // VERIFICAR ARQUIVO
-    // ========================================================
-
-    if (arquivoId) {
-      const arquivo =
-        await prisma.arquivo.findUnique({
+    if (atividadeId) {
+      const atividade =
+        await prisma.atividade.findUnique({
           where: {
-            id: arquivoId,
+            id: atividadeId,
           },
         });
 
-      if (!arquivo) {
+      if (!atividade) {
         return NextResponse.json(
           {
             sucesso: false,
-
             mensagem:
-              "Arquivo não encontrado.",
+              "Atividade não encontrada.",
           },
           {
             status: 404,
           },
         );
       }
+    }
 
-      // Não permitir anexar arquivo
-      // que já esteja ligado a outra entrega.
+    // ========================================================
+    // VERIFICAR ENTREGA
+    // ========================================================
 
-      if (arquivo.entregaId) {
+    if (entregaId) {
+      const entrega =
+        await prisma.entrega.findUnique({
+          where: {
+            id: entregaId,
+          },
+        });
+
+      if (!entrega) {
         return NextResponse.json(
           {
             sucesso: false,
-
             mensagem:
-              "Este arquivo já está associado a uma entrega.",
+              "Entrega não encontrada.",
           },
           {
-            status: 409,
+            status: 404,
           },
         );
       }
     }
 
     // ========================================================
-    // CRIAR ENTREGA
+    // VERIFICAR CONSISTÊNCIA
+    //
+    // Se houver atividade e entrega, a entrega precisa
+    // pertencer à mesma atividade.
     // ========================================================
 
-    const entrega =
-      await prisma.$transaction(
-        async (tx) => {
-          const novaEntrega =
-            await tx.entrega.create({
-              data: {
-                atividadeId,
+    if (atividadeId && entregaId) {
+      const entrega =
+        await prisma.entrega.findUnique({
+          where: {
+            id: entregaId,
+          },
+          select: {
+            atividadeId: true,
+          },
+        });
 
-                alunoId,
+      if (
+        entrega &&
+        entrega.atividadeId !== atividadeId
+      ) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "A entrega não pertence à atividade informada.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
 
-                comentario,
+    // ========================================================
+    // CRIAR ARQUIVO
+    // ========================================================
 
-                status:
-                  "ENVIADA",
-              },
-            });
-
-          // ==================================================
-          // ASSOCIAR ARQUIVO
-          // ==================================================
-
-          if (arquivoId) {
-            await tx.arquivo.update({
-              where: {
-                id: arquivoId,
-              },
-
-              data: {
-                entregaId:
-                  novaEntrega.id,
-              },
-            });
-          }
-
-          // ==================================================
-          // BUSCAR ENTREGA COMPLETA
-          // ==================================================
-
-          return tx.entrega.findUnique({
-            where: {
-              id: novaEntrega.id,
-            },
-
-            include: {
-              aluno: {
-                select: {
-                  id: true,
-                  nome: true,
-                  usuario: true,
-                },
-              },
-
-              atividade: {
-                select: {
-                  id: true,
-                  titulo: true,
-                  descricao: true,
-                  disciplina: true,
-                  semestre: true,
-                  prazo: true,
-                },
-              },
-
-              arquivos: true,
-            },
-          });
+    const arquivo =
+      await prisma.arquivo.create({
+        data: {
+          nomeOriginal,
+          nomeArquivo,
+          caminho,
+          url,
+          mimeType,
+          tamanho,
+          atividadeId,
+          entregaId,
         },
-      );
+
+        include: {
+          atividade: {
+            select: {
+              id: true,
+              titulo: true,
+              disciplina: true,
+              semestre: true,
+            },
+          },
+
+          entrega: {
+            select: {
+              id: true,
+              atividadeId: true,
+              alunoId: true,
+              status: true,
+              nota: true,
+            },
+          },
+        },
+      });
 
     // ========================================================
     // RESPOSTA
@@ -434,9 +377,9 @@ export async function POST(
         sucesso: true,
 
         mensagem:
-          "Atividade entregue com sucesso.",
+          "Arquivo registrado com sucesso.",
 
-        entrega,
+        arquivo,
       },
       {
         status: 201,
@@ -444,16 +387,15 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      "Erro ao registrar entrega:",
+      "Erro ao registrar arquivo:",
       error,
     );
 
     return NextResponse.json(
       {
         sucesso: false,
-
         mensagem:
-          "Não foi possível registrar a entrega.",
+          "Não foi possível registrar o arquivo.",
       },
       {
         status: 500,
@@ -465,43 +407,35 @@ export async function POST(
 // ============================================================
 // PATCH
 //
-// PATCH /api/entregas
-//
-// Corrigir uma entrega.
+// PATCH /api/arquivos
 //
 // JSON:
 //
 // {
 //   "id": "...",
-//   "nota": "A",
-//   "feedback": "Excelente trabalho.",
-//   "status": "AVALIADA"
+//   "nomeOriginal": "...",
+//   "nomeArquivo": "...",
+//   "caminho": "...",
+//   "url": "...",
+//   "mimeType": "...",
+//   "tamanho": 123
 // }
 // ============================================================
 
-export async function PATCH(
-  request: NextRequest,
-) {
+export async function PATCH(request: NextRequest) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    // ========================================================
-    // ID
-    // ========================================================
-
-    const id =
-      String(
-        body.id ?? "",
-      ).trim();
+    const id = String(
+      body.id ?? "",
+    ).trim();
 
     if (!id) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "O ID da entrega é obrigatório.",
+            "O ID do arquivo é obrigatório.",
         },
         {
           status: 400,
@@ -510,23 +444,22 @@ export async function PATCH(
     }
 
     // ========================================================
-    // BUSCAR ENTREGA
+    // VERIFICAR ARQUIVO
     // ========================================================
 
-    const entregaExistente =
-      await prisma.entrega.findUnique({
+    const arquivoExistente =
+      await prisma.arquivo.findUnique({
         where: {
           id,
         },
       });
 
-    if (!entregaExistente) {
+    if (!arquivoExistente) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "Entrega não encontrada.",
+            "Arquivo não encontrado.",
         },
         {
           status: 404,
@@ -535,186 +468,160 @@ export async function PATCH(
     }
 
     // ========================================================
-    // NOTA
-    //
-    // Seu Prisma usa:
-    //
-    // nota String?
-    //
-    // E o sistema P.A.C. utiliza:
-    //
-    // A = PASSOU
-    // B = PASSOU
-    // C = PASSOU
-    // D = REPROVADO
-    // ========================================================
-
-    let nota:
-      | string
-      | null
-      | undefined =
-      undefined;
-
-    if (
-      body.nota !==
-      undefined
-    ) {
-      nota =
-        body.nota === null
-          ? null
-          : String(
-              body.nota,
-            )
-              .trim()
-              .toUpperCase();
-
-      if (
-        nota !== null &&
-        ![
-          "A",
-          "B",
-          "C",
-          "D",
-        ].includes(nota)
-      ) {
-        return NextResponse.json(
-          {
-            sucesso: false,
-
-            mensagem:
-              "A nota deve ser A, B, C ou D.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
-    }
-
-    // ========================================================
-    // COMENTÁRIO / FEEDBACK
-    //
-    // No seu schema o campo é "comentario".
-    // ========================================================
-
-    let comentario:
-      | string
-      | null
-      | undefined =
-      undefined;
-
-    if (
-      body.comentario !==
-      undefined
-    ) {
-      comentario =
-        body.comentario === null
-          ? null
-          : String(
-              body.comentario,
-            ).trim();
-    }
-
-    // ========================================================
-    // STATUS
-    // ========================================================
-
-    let status:
-      | StatusEntrega
-      | undefined =
-      undefined;
-
-    if (
-      body.status !==
-      undefined
-    ) {
-      const statusRecebido =
-        String(
-          body.status,
-        )
-          .trim()
-          .toUpperCase();
-
-      if (
-        ![
-          "ENVIADA",
-          "AVALIADA",
-          "DEVOLVIDA",
-        ].includes(
-          statusRecebido,
-        )
-      ) {
-        return NextResponse.json(
-          {
-            sucesso: false,
-
-            mensagem:
-              "Status inválido. Use ENVIADA, AVALIADA ou DEVOLVIDA.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
-
-      status =
-        statusRecebido as StatusEntrega;
-    }
-
-    // ========================================================
-    // MONTAR DADOS
+    // DADOS OPCIONAIS
     // ========================================================
 
     const data: {
-      nota?: string | null;
-      comentario?: string | null;
-      status?: string;
+      nomeOriginal?: string;
+      nomeArquivo?: string;
+      caminho?: string;
+      url?: string;
+      mimeType?: string | null;
+      tamanho?: number | null;
     } = {};
 
     if (
-      nota !==
-      undefined
+      body.nomeOriginal !== undefined
     ) {
-      data.nota =
-        nota;
+      const valor = String(
+        body.nomeOriginal,
+      ).trim();
+
+      if (!valor) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "O nome original não pode ficar vazio.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      data.nomeOriginal = valor;
     }
 
     if (
-      comentario !==
-      undefined
+      body.nomeArquivo !== undefined
     ) {
-      data.comentario =
-        comentario;
+      const valor = String(
+        body.nomeArquivo,
+      ).trim();
+
+      if (!valor) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "O nome do arquivo não pode ficar vazio.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      data.nomeArquivo = valor;
     }
 
     if (
-      status !==
-      undefined
+      body.caminho !== undefined
     ) {
-      data.status =
-        status;
+      const valor = String(
+        body.caminho,
+      ).trim();
+
+      if (!valor) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "O caminho não pode ficar vazio.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      data.caminho = valor;
     }
 
-    // ========================================================
-    // SE INFORMOU NOTA
-    // AUTOMATICAMENTE FICA AVALIADA
-    // ========================================================
+    if (
+      body.url !== undefined
+    ) {
+      const valor = String(
+        body.url,
+      ).trim();
+
+      if (!valor) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "A URL não pode ficar vazia.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      data.url = valor;
+    }
 
     if (
-      nota !==
-        undefined &&
-      nota !== null
+      body.mimeType !== undefined
     ) {
-      data.status =
-        "AVALIADA";
+      data.mimeType =
+        body.mimeType === null
+          ? null
+          : String(
+              body.mimeType,
+            ).trim();
+    }
+
+    if (
+      body.tamanho !== undefined
+    ) {
+      if (
+        body.tamanho === null ||
+        body.tamanho === ""
+      ) {
+        data.tamanho = null;
+      } else {
+        const tamanho = Number(
+          body.tamanho,
+        );
+
+        if (
+          !Number.isInteger(tamanho) ||
+          tamanho < 0
+        ) {
+          return NextResponse.json(
+            {
+              sucesso: false,
+              mensagem:
+                "O tamanho deve ser um número inteiro maior ou igual a zero.",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
+
+        data.tamanho = tamanho;
+      }
     }
 
     // ========================================================
     // ATUALIZAR
     // ========================================================
 
-    const entrega =
-      await prisma.entrega.update({
+    const arquivo =
+      await prisma.arquivo.update({
         where: {
           id,
         },
@@ -722,41 +629,35 @@ export async function PATCH(
         data,
 
         include: {
-          aluno: {
-            select: {
-              id: true,
-              nome: true,
-              usuario: true,
-            },
-          },
-
           atividade: {
             select: {
               id: true,
               titulo: true,
-              descricao: true,
               disciplina: true,
               semestre: true,
-              prazo: true,
             },
           },
 
-          arquivos: true,
+          entrega: {
+            select: {
+              id: true,
+              atividadeId: true,
+              alunoId: true,
+              status: true,
+              nota: true,
+            },
+          },
         },
       });
-
-    // ========================================================
-    // RESPOSTA
-    // ========================================================
 
     return NextResponse.json(
       {
         sucesso: true,
 
         mensagem:
-          "Entrega atualizada com sucesso.",
+          "Arquivo atualizado com sucesso.",
 
-        entrega,
+        arquivo,
       },
       {
         status: 200,
@@ -764,16 +665,15 @@ export async function PATCH(
     );
   } catch (error) {
     console.error(
-      "Erro ao atualizar entrega:",
+      "Erro ao atualizar arquivo:",
       error,
     );
 
     return NextResponse.json(
       {
         sucesso: false,
-
         mensagem:
-          "Não foi possível atualizar a entrega.",
+          "Não foi possível atualizar o arquivo.",
       },
       {
         status: 500,
@@ -785,7 +685,7 @@ export async function PATCH(
 // ============================================================
 // DELETE
 //
-// DELETE /api/entregas?id=...
+// DELETE /api/arquivos?id=...
 // ============================================================
 
 export async function DELETE(
@@ -802,9 +702,8 @@ export async function DELETE(
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "O ID da entrega é obrigatório.",
+            "O ID do arquivo é obrigatório.",
         },
         {
           status: 400,
@@ -816,24 +715,36 @@ export async function DELETE(
     // VERIFICAR
     // ========================================================
 
-    const entrega =
-      await prisma.entrega.findUnique({
+    const arquivo =
+      await prisma.arquivo.findUnique({
         where: {
           id,
         },
 
         include: {
-          arquivos: true,
+          atividade: {
+            select: {
+              id: true,
+              titulo: true,
+            },
+          },
+
+          entrega: {
+            select: {
+              id: true,
+              atividadeId: true,
+              alunoId: true,
+            },
+          },
         },
       });
 
-    if (!entrega) {
+    if (!arquivo) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "Entrega não encontrada.",
+            "Arquivo não encontrado.",
         },
         {
           status: 404,
@@ -842,20 +753,23 @@ export async function DELETE(
     }
 
     // ========================================================
-    // EXCLUIR
-    //
-    // Os arquivos relacionados também serão
-    // excluídos devido ao onDelete: Cascade.
+    // EXCLUIR REGISTRO
     // ========================================================
 
-    await prisma.entrega.delete({
+    await prisma.arquivo.delete({
       where: {
         id,
       },
     });
 
     // ========================================================
-    // RESPOSTA
+    // IMPORTANTE
+    //
+    // O Prisma remove o registro do banco.
+    //
+    // A exclusão física do arquivo no Storage deverá ser
+    // feita pelo serviço de armazenamento utilizado pela
+    // aplicação.
     // ========================================================
 
     return NextResponse.json(
@@ -863,9 +777,9 @@ export async function DELETE(
         sucesso: true,
 
         mensagem:
-          "Entrega removida com sucesso.",
+          "Arquivo removido com sucesso.",
 
-        entrega,
+        arquivo,
       },
       {
         status: 200,
@@ -873,16 +787,15 @@ export async function DELETE(
     );
   } catch (error) {
     console.error(
-      "Erro ao excluir entrega:",
+      "Erro ao excluir arquivo:",
       error,
     );
 
     return NextResponse.json(
       {
         sucesso: false,
-
         mensagem:
-          "Não foi possível excluir a entrega.",
+          "Não foi possível excluir o arquivo.",
       },
       {
         status: 500,

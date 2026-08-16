@@ -3,6 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ============================================================
+// P.A.C.
+// Plataforma de Atividade Curricular
+//
+// src/app/api/entregas/route.ts
+//
+// API DE ENTREGAS DE ATIVIDADES
+//
+// Banco: Prisma + PostgreSQL
+// ============================================================
+
+type StatusEntrega =
+  | "ENVIADA"
+  | "AVALIADA"
+  | "DEVOLVIDA";
+
+// ============================================================
 // GET /api/entregas
 //
 // Exemplos:
@@ -25,18 +41,24 @@ export async function GET(
     const alunoId =
       searchParams.get("alunoId");
 
+    // ========================================================
+    // FILTROS
+    // ========================================================
+
     const entregas =
       await prisma.entrega.findMany({
         where: {
           ...(atividadeId
             ? {
-                atividadeId,
+                atividadeId:
+                  atividadeId.trim(),
               }
             : {}),
 
           ...(alunoId
             ? {
-                alunoId,
+                alunoId:
+                  alunoId.trim(),
               }
             : {}),
         },
@@ -69,11 +91,16 @@ export async function GET(
         },
       });
 
-    return NextResponse.json({
-      sucesso: true,
-      total: entregas.length,
-      entregas,
-    });
+    return NextResponse.json(
+      {
+        sucesso: true,
+        total: entregas.length,
+        entregas,
+      },
+      {
+        status: 200,
+      },
+    );
   } catch (error) {
     console.error(
       "Erro ao buscar entregas:",
@@ -95,6 +122,17 @@ export async function GET(
 
 // ============================================================
 // POST /api/entregas
+//
+// Cria uma entrega.
+//
+// Body:
+//
+// {
+//   "atividadeId": "...",
+//   "alunoId": "...",
+//   "comentario": "...",
+//   "arquivoId": "..."
+// }
 // ============================================================
 
 export async function POST(
@@ -104,26 +142,59 @@ export async function POST(
     const body =
       await request.json();
 
-    const {
-      atividadeId,
-      alunoId,
-      comentario,
-      arquivoId,
-    } = body;
+    // ========================================================
+    // DADOS
+    // ========================================================
+
+    const atividadeId =
+      String(
+        body.atividadeId ?? "",
+      ).trim();
+
+    const alunoId =
+      String(
+        body.alunoId ?? "",
+      ).trim();
+
+    const arquivoId =
+      body.arquivoId
+        ? String(
+            body.arquivoId,
+          ).trim()
+        : null;
+
+    const comentario =
+      body.comentario !==
+        undefined &&
+      body.comentario !== null
+        ? String(
+            body.comentario,
+          ).trim()
+        : null;
 
     // ========================================================
     // VALIDAÇÃO
     // ========================================================
 
-    if (
-      !atividadeId ||
-      !alunoId
-    ) {
+    if (!atividadeId) {
       return NextResponse.json(
         {
           sucesso: false,
           mensagem:
-            "atividadeId e alunoId são obrigatórios.",
+            "O atividadeId é obrigatório.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (!alunoId) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "O alunoId é obrigatório.",
         },
         {
           status: 400,
@@ -138,7 +209,7 @@ export async function POST(
     const aluno =
       await prisma.aluno.findUnique({
         where: {
-          id: String(alunoId),
+          id: alunoId,
         },
       });
 
@@ -162,7 +233,7 @@ export async function POST(
     const atividade =
       await prisma.atividade.findUnique({
         where: {
-          id: String(atividadeId),
+          id: atividadeId,
         },
       });
 
@@ -187,12 +258,13 @@ export async function POST(
       await prisma.entrega.findUnique({
         where: {
           atividadeId_alunoId: {
-            atividadeId:
-              String(atividadeId),
-
-            alunoId:
-              String(alunoId),
+            atividadeId,
+            alunoId,
           },
+        },
+
+        include: {
+          arquivos: true,
         },
       });
 
@@ -200,6 +272,7 @@ export async function POST(
       return NextResponse.json(
         {
           sucesso: false,
+
           mensagem:
             "O aluno já possui uma entrega para esta atividade.",
 
@@ -210,6 +283,49 @@ export async function POST(
           status: 409,
         },
       );
+    }
+
+    // ========================================================
+    // VERIFICAR ARQUIVO
+    // ========================================================
+
+    if (arquivoId) {
+      const arquivo =
+        await prisma.arquivo.findUnique({
+          where: {
+            id: arquivoId,
+          },
+        });
+
+      if (!arquivo) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "Arquivo não encontrado.",
+          },
+          {
+            status: 404,
+          },
+        );
+      }
+
+      // O arquivo não pode estar associado
+      // a outra entrega.
+
+      if (arquivo.entregaId) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+
+            mensagem:
+              "Este arquivo já está associado a uma entrega.",
+          },
+          {
+            status: 409,
+          },
+        );
+      }
     }
 
     // ========================================================
@@ -225,97 +341,110 @@ export async function POST(
 
     // ========================================================
     // CRIAR ENTREGA
+    //
+    // O status inicial continua ENVIADA.
+    //
+    // A informação de atraso pode ser determinada pelo
+    // prazo da atividade sem criar um novo status no banco.
     // ========================================================
 
     const entrega =
-      await prisma.entrega.create({
-        data: {
-          atividadeId:
-            String(atividadeId),
+      await prisma.$transaction(
+        async (tx) => {
+          const novaEntrega =
+            await tx.entrega.create({
+              data: {
+                atividadeId,
+                alunoId,
+                comentario:
+                  comentario || null,
+                status:
+                  "ENVIADA",
+              },
 
-          alunoId:
-            String(alunoId),
+              include: {
+                aluno: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    usuario: true,
+                  },
+                },
 
-          comentario:
-            comentario
-              ? String(
-                  comentario,
-                ).trim()
-              : null,
+                atividade: {
+                  select: {
+                    id: true,
+                    titulo: true,
+                    descricao: true,
+                    disciplina: true,
+                    semestre: true,
+                    prazo: true,
+                  },
+                },
 
-          status:
-            atrasada
-              ? "ATRASADA"
-              : "ENTREGUE",
-        },
+                arquivos: true,
+              },
+            });
 
-        include: {
-          aluno: {
-            select: {
-              id: true,
-              nome: true,
-              usuario: true,
+          // ==================================================
+          // ASSOCIAR ARQUIVO
+          // ==================================================
+
+          if (arquivoId) {
+            await tx.arquivo.update({
+              where: {
+                id: arquivoId,
+              },
+
+              data: {
+                entregaId:
+                  novaEntrega.id,
+
+                // O arquivo pertence agora à entrega.
+                atividadeId:
+                  null,
+              },
+            });
+          }
+
+          // ==================================================
+          // BUSCAR ENTREGA COMPLETA
+          // ==================================================
+
+          return tx.entrega.findUnique({
+            where: {
+              id: novaEntrega.id,
             },
-          },
 
-          atividade: {
-            select: {
-              id: true,
-              titulo: true,
-              disciplina: true,
-              semestre: true,
-              prazo: true,
+            include: {
+              aluno: {
+                select: {
+                  id: true,
+                  nome: true,
+                  usuario: true,
+                },
+              },
+
+              atividade: {
+                select: {
+                  id: true,
+                  titulo: true,
+                  descricao: true,
+                  disciplina: true,
+                  semestre: true,
+                  prazo: true,
+                },
+              },
+
+              arquivos: true,
             },
-          },
-
-          arquivos: true,
+          });
         },
-      });
+      );
 
     // ========================================================
-    // ASSOCIAR ARQUIVO
+    // RESPOSTA
     // ========================================================
-
-    if (arquivoId) {
-      await prisma.arquivo.update({
-        where: {
-          id: String(arquivoId),
-        },
-
-        data: {
-          entregaId:
-            entrega.id,
-
-          atividadeId:
-            null,
-        },
-      });
-    }
-
-    // ========================================================
-    // BUSCAR ENTREGA ATUALIZADA
-    // ========================================================
-
-    const entregaFinal =
-      await prisma.entrega.findUnique({
-        where: {
-          id: entrega.id,
-        },
-
-        include: {
-          aluno: {
-            select: {
-              id: true,
-              nome: true,
-              usuario: true,
-            },
-          },
-
-          atividade: true,
-
-          arquivos: true,
-        },
-      });
 
     return NextResponse.json(
       {
@@ -326,8 +455,9 @@ export async function POST(
             ? "Atividade entregue após o prazo."
             : "Atividade entregue com sucesso.",
 
-        entrega:
-          entregaFinal,
+        atrasada,
+
+        entrega,
       },
       {
         status: 201,
@@ -342,9 +472,423 @@ export async function POST(
     return NextResponse.json(
       {
         sucesso: false,
-
         mensagem:
           "Não foi possível registrar a entrega.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
+
+// ============================================================
+// PATCH /api/entregas
+//
+// Atualiza uma entrega.
+//
+// Body:
+//
+// {
+//   "id": "...",
+//   "nota": "A",
+//   "comentario": "...",
+//   "status": "AVALIADA"
+// }
+// ============================================================
+
+export async function PATCH(
+  request: NextRequest,
+) {
+  try {
+    const body =
+      await request.json();
+
+    const id =
+      String(
+        body.id ?? "",
+      ).trim();
+
+    // ========================================================
+    // VALIDAR ID
+    // ========================================================
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "O ID da entrega é obrigatório.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    // ========================================================
+    // BUSCAR ENTREGA
+    // ========================================================
+
+    const entregaExistente =
+      await prisma.entrega.findUnique({
+        where: {
+          id,
+        },
+      });
+
+    if (!entregaExistente) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "Entrega não encontrada.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    // ========================================================
+    // NOTA
+    //
+    // A = PASSOU
+    // B = PASSOU
+    // C = PASSOU
+    // D = REPROVADO
+    // ========================================================
+
+    let nota:
+      | string
+      | null
+      | undefined =
+      undefined;
+
+    if (
+      body.nota !==
+      undefined
+    ) {
+      nota =
+        body.nota === null
+          ? null
+          : String(
+              body.nota,
+            )
+              .trim()
+              .toUpperCase();
+
+      if (
+        nota !== null &&
+        ![
+          "A",
+          "B",
+          "C",
+          "D",
+        ].includes(nota)
+      ) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "A nota deve ser A, B, C ou D.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    // ========================================================
+    // COMENTÁRIO
+    // ========================================================
+
+    let comentario:
+      | string
+      | null
+      | undefined =
+      undefined;
+
+    if (
+      body.comentario !==
+      undefined
+    ) {
+      comentario =
+        body.comentario === null
+          ? null
+          : String(
+              body.comentario,
+            ).trim();
+    }
+
+    // ========================================================
+    // STATUS
+    // ========================================================
+
+    let status:
+      | StatusEntrega
+      | undefined =
+      undefined;
+
+    if (
+      body.status !==
+      undefined
+    ) {
+      const statusRecebido =
+        String(
+          body.status,
+        )
+          .trim()
+          .toUpperCase();
+
+      if (
+        ![
+          "ENVIADA",
+          "AVALIADA",
+          "DEVOLVIDA",
+        ].includes(
+          statusRecebido,
+        )
+      ) {
+        return NextResponse.json(
+          {
+            sucesso: false,
+
+            mensagem:
+              "Status inválido. Use ENVIADA, AVALIADA ou DEVOLVIDA.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      status =
+        statusRecebido as StatusEntrega;
+    }
+
+    // ========================================================
+    // DADOS PARA ATUALIZAÇÃO
+    // ========================================================
+
+    const data: {
+      nota?: string | null;
+      comentario?: string | null;
+      status?: string;
+    } = {};
+
+    if (
+      nota !==
+      undefined
+    ) {
+      data.nota =
+        nota;
+    }
+
+    if (
+      comentario !==
+      undefined
+    ) {
+      data.comentario =
+        comentario;
+    }
+
+    if (
+      status !==
+      undefined
+    ) {
+      data.status =
+        status;
+    }
+
+    // ========================================================
+    // SE RECEBEU UMA NOTA,
+    // MARCA AUTOMATICAMENTE COMO AVALIADA
+    // ========================================================
+
+    if (
+      nota !==
+        undefined &&
+      nota !== null
+    ) {
+      data.status =
+        "AVALIADA";
+    }
+
+    // ========================================================
+    // ATUALIZAR
+    // ========================================================
+
+    const entrega =
+      await prisma.entrega.update({
+        where: {
+          id,
+        },
+
+        data,
+
+        include: {
+          aluno: {
+            select: {
+              id: true,
+              nome: true,
+              usuario: true,
+            },
+          },
+
+          atividade: {
+            select: {
+              id: true,
+              titulo: true,
+              descricao: true,
+              disciplina: true,
+              semestre: true,
+              prazo: true,
+            },
+          },
+
+          arquivos: true,
+        },
+      });
+
+    // ========================================================
+    // RESPOSTA
+    // ========================================================
+
+    return NextResponse.json(
+      {
+        sucesso: true,
+
+        mensagem:
+          "Entrega atualizada com sucesso.",
+
+        entrega,
+      },
+      {
+        status: 200,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "Erro ao atualizar entrega:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        sucesso: false,
+
+        mensagem:
+          "Não foi possível atualizar a entrega.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
+
+// ============================================================
+// DELETE /api/entregas?id=...
+// ============================================================
+
+export async function DELETE(
+  request: NextRequest,
+) {
+  try {
+    const { searchParams } =
+      new URL(request.url);
+
+    const id =
+      searchParams.get("id");
+
+    // ========================================================
+    // VALIDAR ID
+    // ========================================================
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+
+          mensagem:
+            "O ID da entrega é obrigatório.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    // ========================================================
+    // BUSCAR ENTREGA
+    // ========================================================
+
+    const entrega =
+      await prisma.entrega.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          arquivos: true,
+        },
+      });
+
+    if (!entrega) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+
+          mensagem:
+            "Entrega não encontrada.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    // ========================================================
+    // EXCLUIR
+    // ========================================================
+
+    await prisma.entrega.delete({
+      where: {
+        id,
+      },
+    });
+
+    // ========================================================
+    // RESPOSTA
+    // ========================================================
+
+    return NextResponse.json(
+      {
+        sucesso: true,
+
+        mensagem:
+          "Entrega removida com sucesso.",
+
+        entrega,
+      },
+      {
+        status: 200,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "Erro ao excluir entrega:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        sucesso: false,
+
+        mensagem:
+          "Não foi possível excluir a entrega.",
       },
       {
         status: 500,

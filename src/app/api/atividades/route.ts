@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // ============================================================
 // P.A.C.
 // Plataforma de Atividade Curricular
 //
+// src/app/api/atividades/route.ts
+//
 // API DE ATIVIDADES
 //
-// Banco: Prisma + SQLite
+// Banco: Prisma + PostgreSQL
 // ============================================================
 
 // ============================================================
@@ -22,35 +24,27 @@ import { prisma } from "../../../../lib/prisma";
 // /api/atividades?semestre=1
 // ============================================================
 
-export async function GET(
-  request: NextRequest,
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } =
-      new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
     const professorId =
-      searchParams.get(
-        "professorId",
-      );
+      searchParams.get("professorId");
 
     const disciplina =
-      searchParams.get(
-        "disciplina",
-      );
+      searchParams.get("disciplina");
 
     const semestreTexto =
-      searchParams.get(
-        "semestre",
-      );
+      searchParams.get("semestre");
 
     const semestre =
-      semestreTexto
+      semestreTexto !== null &&
+      semestreTexto.trim() !== ""
         ? Number(semestreTexto)
         : undefined;
 
     // ========================================================
-    // BUSCAR ATIVIDADES NO PRISMA
+    // BUSCAR ATIVIDADES
     // ========================================================
 
     const atividades =
@@ -58,22 +52,18 @@ export async function GET(
         where: {
           ...(professorId
             ? {
-                professorId,
+                professorId: professorId.trim(),
               }
-            }
             : {}),
 
           ...(disciplina
             ? {
-                disciplina,
+                disciplina: disciplina.trim(),
               }
             : {}),
 
-          ...(semestre !==
-            undefined &&
-          Number.isInteger(
-            semestre,
-          )
+          ...(semestre !== undefined &&
+          Number.isInteger(semestre)
             ? {
                 semestre,
               }
@@ -116,14 +106,16 @@ export async function GET(
     // RESPOSTA
     // ========================================================
 
-    return NextResponse.json({
-      sucesso: true,
-
-      total:
-        atividades.length,
-
-      atividades,
-    });
+    return NextResponse.json(
+      {
+        sucesso: true,
+        total: atividades.length,
+        atividades,
+      },
+      {
+        status: 200,
+      },
+    );
   } catch (error) {
     console.error(
       "Erro ao buscar atividades:",
@@ -133,11 +125,9 @@ export async function GET(
     return NextResponse.json(
       {
         sucesso: false,
-
         mensagem:
           "Erro ao buscar atividades.",
       },
-
       {
         status: 500,
       },
@@ -148,7 +138,7 @@ export async function GET(
 // ============================================================
 // POST /api/atividades
 //
-// Cria uma nova atividade no banco.
+// Cria uma nova atividade.
 //
 // Body:
 //
@@ -162,38 +152,62 @@ export async function GET(
 // }
 // ============================================================
 
-export async function POST(
-  request: NextRequest,
-) {
+export async function POST(request: NextRequest) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const {
-      titulo,
-      descricao,
-      professorId,
-      disciplina,
-      semestre,
-      prazo,
-    } = body;
+    // ========================================================
+    // DADOS
+    // ========================================================
+
+    const titulo =
+      String(body.titulo ?? "").trim();
+
+    const descricao =
+      body.descricao !== undefined &&
+      body.descricao !== null
+        ? String(body.descricao).trim()
+        : null;
+
+    const professorId =
+      String(body.professorId ?? "").trim();
+
+    const disciplina =
+      body.disciplina !== undefined &&
+      body.disciplina !== null
+        ? String(body.disciplina).trim()
+        : null;
+
+    const semestre =
+      body.semestre;
+
+    const prazo =
+      body.prazo;
 
     // ========================================================
     // VALIDAÇÃO
     // ========================================================
 
-    if (
-      !titulo ||
-      !professorId
-    ) {
+    if (!titulo) {
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
-            "Título e professor são obrigatórios.",
+            "O título da atividade é obrigatório.",
         },
+        {
+          status: 400,
+        },
+      );
+    }
 
+    if (!professorId) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          mensagem:
+            "O professorId é obrigatório.",
+        },
         {
           status: 400,
         },
@@ -207,9 +221,7 @@ export async function POST(
     const professor =
       await prisma.professor.findUnique({
         where: {
-          id: String(
-            professorId,
-          ),
+          id: professorId,
         },
       });
 
@@ -217,11 +229,9 @@ export async function POST(
       return NextResponse.json(
         {
           sucesso: false,
-
           mensagem:
             "Professor não encontrado.",
         },
-
         {
           status: 404,
         },
@@ -236,24 +246,29 @@ export async function POST(
       number | null = null;
 
     if (
-      semestre !==
-        undefined &&
-      semestre !==
-        null &&
+      semestre !== undefined &&
+      semestre !== null &&
       semestre !== ""
     ) {
-      const numero =
-        Number(semestre);
+      const numero = Number(semestre);
 
       if (
-        Number.isInteger(
-          numero,
-        ) &&
-        numero > 0
+        !Number.isInteger(numero) ||
+        numero <= 0
       ) {
-        semestreNumero =
-          numero;
+        return NextResponse.json(
+          {
+            sucesso: false,
+            mensagem:
+              "O semestre deve ser um número inteiro maior que zero.",
+          },
+          {
+            status: 400,
+          },
+        );
       }
+
+      semestreNumero = numero;
     }
 
     // ========================================================
@@ -263,23 +278,22 @@ export async function POST(
     let prazoData:
       Date | null = null;
 
-    if (prazo) {
-      const data =
-        new Date(prazo);
+    if (
+      prazo !== undefined &&
+      prazo !== null &&
+      prazo !== ""
+    ) {
+      const data = new Date(prazo);
 
       if (
-        Number.isNaN(
-          data.getTime(),
-        )
+        Number.isNaN(data.getTime())
       ) {
         return NextResponse.json(
           {
             sucesso: false,
-
             mensagem:
               "A data do prazo é inválida.",
           },
-
           {
             status: 400,
           },
@@ -296,29 +310,15 @@ export async function POST(
     const atividade =
       await prisma.atividade.create({
         data: {
-          titulo:
-            String(
-              titulo,
-            ).trim(),
+          titulo,
 
           descricao:
-            descricao
-              ? String(
-                  descricao,
-                ).trim()
-              : null,
+            descricao || null,
 
-          professorId:
-            String(
-              professorId,
-            ),
+          professorId,
 
           disciplina:
-            disciplina
-              ? String(
-                  disciplina,
-                ).trim()
-              : null,
+            disciplina || null,
 
           semestre:
             semestreNumero,
@@ -356,7 +356,6 @@ export async function POST(
 
         atividade,
       },
-
       {
         status: 201,
       },
@@ -374,7 +373,6 @@ export async function POST(
         mensagem:
           "Não foi possível criar a atividade.",
       },
-
       {
         status: 500,
       },
