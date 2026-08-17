@@ -11,13 +11,13 @@ provider = "mysql"
 // ============================================================
 
 model Professor {
-id         String  @id @default(cuid())
+id         String   @id @default(cuid())
 nome       String
-usuario    String  @unique
+usuario    String   @unique
 senha      String
 disciplina String?
 email      String?
-ativo      Boolean @default(true)
+ativo      Boolean  @default(true)
 
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
@@ -30,12 +30,12 @@ atividades Atividade[]
 // ============================================================
 
 model Aluno {
-id      String  @id @default(cuid())
-nome    String
-usuario String  @unique
-senha   String
-idade   Int?
-ativo   Boolean @default(true)
+id       String  @id @default(cuid())
+nome     String
+usuario  String  @unique
+senha    String
+idade    Int?
+ativo    Boolean @default(true)
 
 createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
@@ -48,7 +48,7 @@ entregas Entrega[]
 // ============================================================
 
 model Atividade {
-id          String   @id @default(cuid())
+id          String    @id @default(cuid())
 titulo      String
 descricao   String?
 professorId String
@@ -60,9 +60,8 @@ createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
 
 professor Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
-
-arquivos Arquivo[]
-entregas Entrega[]
+arquivos  Arquivo[]
+entregas  Entrega[]
 }
 
 // ============================================================
@@ -83,8 +82,7 @@ updatedAt DateTime @updatedAt
 
 atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
 aluno     Aluno     @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-
-arquivos Arquivo[]
+arquivos  Arquivo[]
 
 @@unique([atividadeId, alunoId])
 }
@@ -94,7 +92,7 @@ arquivos Arquivo[]
 // ============================================================
 
 model Arquivo {
-id           String  @id @default(cuid())
+id           String   @id @default(cuid())
 nomeOriginal String
 nomeArquivo  String
 caminho      String
