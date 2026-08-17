@@ -2,17 +2,20 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-title: "P.A.C. - Plataforma de Atividade Curricular",
-description: "Plataforma de Atividade Curricular",
+  title: "P.A.C. - Plataforma de Atividade Curricular",
+  description: "Plataforma de Atividade Curricular",
 };
 
 interface RootLayoutProps {
-children: React.ReactNode;
+  children: React.ReactNode;
 }
 
 export default function RootLayout({
-children,
+  children,
 }: RootLayoutProps) {
-return ( <html lang="pt-BR"> <body>{children}</body> </html>
-);
+  return (
+    <html lang="pt-BR">
+      <body>{children}</body>
+    </html>
+  );
 }
