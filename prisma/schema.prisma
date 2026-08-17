@@ -1,9 +1,9 @@
 generator client {
-provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-provider = "mysql"
+  provider = "mysql"
 }
 
 // ============================================================
@@ -11,18 +11,18 @@ provider = "mysql"
 // ============================================================
 
 model Professor {
-id         String   @id @default(cuid())
-nome       String
-usuario    String   @unique
-senha      String
-disciplina String?
-email      String?
-ativo      Boolean  @default(true)
+  id         String  @id @default(cuid())
+  nome       String
+  usuario    String  @unique
+  senha      String
+  disciplina String?
+  email      String?
+  ativo      Boolean @default(true)
 
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-atividades Atividade[]
+  atividades Atividade[]
 }
 
 // ============================================================
@@ -30,17 +30,17 @@ atividades Atividade[]
 // ============================================================
 
 model Aluno {
-id       String  @id @default(cuid())
-nome     String
-usuario  String  @unique
-senha    String
-idade    Int?
-ativo    Boolean @default(true)
+  id      String  @id @default(cuid())
+  nome    String
+  usuario String  @unique
+  senha   String
+  idade   Int?
+  ativo   Boolean @default(true)
 
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-entregas Entrega[]
+  entregas Entrega[]
 }
 
 // ============================================================
@@ -48,20 +48,21 @@ entregas Entrega[]
 // ============================================================
 
 model Atividade {
-id          String    @id @default(cuid())
-titulo      String
-descricao   String?
-professorId String
-disciplina  String?
-semestre    Int?
-prazo       DateTime?
+  id          String    @id @default(cuid())
+  titulo      String
+  descricao   String?
+  professorId String
+  disciplina  String?
+  semestre    Int?
+  prazo       DateTime?
 
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-professor Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
-arquivos  Arquivo[]
-entregas  Entrega[]
+  professor Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+
+  arquivos Arquivo[]
+  entregas Entrega[]
 }
 
 // ============================================================
@@ -69,22 +70,24 @@ entregas  Entrega[]
 // ============================================================
 
 model Entrega {
-id          String  @id @default(cuid())
-atividadeId String
-alunoId     String
-comentario  String?
-status      String  @default("ENVIADA")
-nota        String?
-feedback    String?
+  id          String  @id @default(cuid())
+  atividadeId String
+  alunoId     String
+  comentario  String?
+  status      String  @default("ENVIADA")
+  nota        String?
+  feedback    String?
 
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
-aluno     Aluno     @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-arquivos  Arquivo[]
+  atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
 
-@@unique([atividadeId, alunoId])
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  arquivos Arquivo[]
+
+  @@unique([atividadeId, alunoId])
 }
 
 // ============================================================
@@ -92,18 +95,21 @@ arquivos  Arquivo[]
 // ============================================================
 
 model Arquivo {
-id           String   @id @default(cuid())
-nomeOriginal String
-nomeArquivo  String
-caminho      String
-url          String
-mimeType     String?
-tamanho      Int?
-atividadeId  String?
-entregaId    String?
+  id           String @id @default(cuid())
+  nomeOriginal String
+  nomeArquivo  String
+  caminho      String
+  url          String
 
-createdAt DateTime @default(now())
+  mimeType String?
+  tamanho  Int?
 
-atividade Atividade? @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
-entrega   Entrega?   @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  atividadeId String?
+  entregaId   String?
+
+  createdAt DateTime @default(now())
+
+  atividade Atividade? @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+
+  entrega Entrega? @relation(fields: [entregaId], references: [id], onDelete: Cascade)
 }
