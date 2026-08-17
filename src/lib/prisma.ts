@@ -1,66 +1,25 @@
-// ============================================================
-// P.A.C.
-// Plataforma de Atividade Curricular
-//
-// src/lib/prisma.ts
-//
-// Prisma 7 + PostgreSQL
-// ============================================================
-
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
-// ============================================================
-// VERIFICAR DATABASE_URL
-// ============================================================
+const globalForPrisma = globalThis as unknown as {
+prisma: PrismaClient | undefined;
+};
 
-const connectionString =
-  process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL não está configurada."
-  );
-}
-
-// ============================================================
-// SINGLETON
-// Evita criar vários PrismaClient
-// em ambiente de desenvolvimento/serverless.
-// ============================================================
-
-const globalForPrisma =
-  globalThis as unknown as {
-    prisma?: PrismaClient;
-  };
-
-// ============================================================
-// ADAPTER POSTGRESQL
-// ============================================================
-
-const adapter =
-  new PrismaPg({
-    connectionString,
-  });
-
-// ============================================================
-// PRISMA CLIENT
-// ============================================================
+const adapter = new PrismaMariaDb({
+host: process.env.DATABASE_HOST || "localhost",
+port: Number(process.env.DATABASE_PORT || "3306"),
+user: process.env.DATABASE_USER || "root",
+password: process.env.DATABASE_PASSWORD || "",
+database: process.env.DATABASE_NAME || "pac",
+connectionLimit: 5,
+});
 
 export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter,
-  });
+globalForPrisma.prisma ??
+new PrismaClient({
+adapter,
+});
 
-// ============================================================
-// DESENVOLVIMENTO
-// ============================================================
-
-if (
-  process.env.NODE_ENV !==
-  "production"
-) {
-  globalForPrisma.prisma =
-    prisma;
+if (process.env.NODE_ENV !== "production") {
+globalForPrisma.prisma = prisma;
 }

@@ -2,7 +2,7 @@
 // P.A.C.
 // Plataforma de Atividade Curricular
 //
-// curriculo.ts
+// src/data/curriculo.ts
 //
 // CURRÍCULO DA LICENCIATURA EM COMPUTAÇÃO
 //
@@ -13,6 +13,7 @@
 // ============================================================
 
 import type {
+  Competencia,
   Disciplina,
   Semestre,
 } from "../types/academico";
@@ -55,7 +56,7 @@ function criarDisciplina(
   nome: string,
   semestre: number,
   cargaHoraria: number,
-  competencia: string,
+  competencia: Competencia | null,
 ): Disciplina {
 
   return {
@@ -96,6 +97,7 @@ function criarDisciplina(
     // B = aprovado
     // C = aprovado
     // D = reprovado
+    // null = ainda não avaliada
     // ----------------------------------------------------------
 
     competencia,
@@ -115,7 +117,7 @@ const SEMESTRE_1: Disciplina[] = [
     "Introdução à Computação",
     1,
     60,
-    "Introdução aos fundamentos da Computação.",
+    null,
   ),
 
   criarDisciplina(
@@ -124,7 +126,7 @@ const SEMESTRE_1: Disciplina[] = [
     "Algoritmos e Programação",
     1,
     90,
-    "Desenvolvimento do raciocínio lógico e programação.",
+    null,
   ),
 
   criarDisciplina(
@@ -133,7 +135,7 @@ const SEMESTRE_1: Disciplina[] = [
     "Matemática Discreta",
     1,
     60,
-    "Fundamentos matemáticos aplicados à Computação.",
+    null,
   ),
 
   criarDisciplina(
@@ -142,7 +144,7 @@ const SEMESTRE_1: Disciplina[] = [
     "Fundamentos da Educação",
     1,
     60,
-    "Fundamentos históricos, sociais e pedagógicos da Educação.",
+    null,
   ),
 
 ];
@@ -160,7 +162,7 @@ const SEMESTRE_2: Disciplina[] = [
     "Estruturas de Dados",
     2,
     90,
-    "Organização e manipulação de estruturas de dados.",
+    null,
   ),
 
   criarDisciplina(
@@ -169,7 +171,7 @@ const SEMESTRE_2: Disciplina[] = [
     "Programação Orientada a Objetos",
     2,
     90,
-    "Desenvolvimento de sistemas utilizando orientação a objetos.",
+    null,
   ),
 
   criarDisciplina(
@@ -178,7 +180,7 @@ const SEMESTRE_2: Disciplina[] = [
     "Arquitetura de Computadores",
     2,
     60,
-    "Organização e funcionamento dos computadores.",
+    null,
   ),
 
   criarDisciplina(
@@ -187,7 +189,7 @@ const SEMESTRE_2: Disciplina[] = [
     "Psicologia da Educação",
     2,
     60,
-    "Aspectos psicológicos relacionados ao processo educacional.",
+    null,
   ),
 
 ];
@@ -205,7 +207,7 @@ const SEMESTRE_3: Disciplina[] = [
     "Banco de Dados",
     3,
     90,
-    "Modelagem, implementação e gerenciamento de bancos de dados.",
+    null,
   ),
 
   criarDisciplina(
@@ -214,7 +216,7 @@ const SEMESTRE_3: Disciplina[] = [
     "Engenharia de Software",
     3,
     90,
-    "Processos, métodos e práticas para desenvolvimento de software.",
+    null,
   ),
 
   criarDisciplina(
@@ -223,7 +225,7 @@ const SEMESTRE_3: Disciplina[] = [
     "Sistemas Operacionais",
     3,
     60,
-    "Conceitos e funcionamento dos sistemas operacionais.",
+    null,
   ),
 
   criarDisciplina(
@@ -232,7 +234,7 @@ const SEMESTRE_3: Disciplina[] = [
     "Didática Geral",
     3,
     60,
-    "Fundamentos e práticas do processo de ensino.",
+    null,
   ),
 
 ];
@@ -250,7 +252,7 @@ const SEMESTRE_4: Disciplina[] = [
     "Redes de Computadores",
     4,
     90,
-    "Comunicação de dados e redes de computadores.",
+    null,
   ),
 
   criarDisciplina(
@@ -259,7 +261,7 @@ const SEMESTRE_4: Disciplina[] = [
     "Desenvolvimento Web",
     4,
     90,
-    "Desenvolvimento de aplicações para a Web.",
+    null,
   ),
 
   criarDisciplina(
@@ -268,7 +270,7 @@ const SEMESTRE_4: Disciplina[] = [
     "Interação Humano-Computador",
     4,
     60,
-    "Interfaces, usabilidade e experiência do usuário.",
+    null,
   ),
 
   criarDisciplina(
@@ -277,7 +279,7 @@ const SEMESTRE_4: Disciplina[] = [
     "Metodologia Científica",
     4,
     60,
-    "Métodos científicos e elaboração de trabalhos acadêmicos.",
+    null,
   ),
 
 ];
@@ -295,7 +297,7 @@ const SEMESTRE_5: Disciplina[] = [
     "Inteligência Artificial",
     5,
     90,
-    "Fundamentos e aplicações de Inteligência Artificial.",
+    null,
   ),
 
   criarDisciplina(
@@ -304,7 +306,7 @@ const SEMESTRE_5: Disciplina[] = [
     "Programação para Dispositivos Móveis",
     5,
     90,
-    "Desenvolvimento de aplicações para dispositivos móveis.",
+    null,
   ),
 
   criarDisciplina(
@@ -313,7 +315,7 @@ const SEMESTRE_5: Disciplina[] = [
     "Tecnologias Educacionais",
     5,
     60,
-    "Tecnologias aplicadas aos processos educacionais.",
+    null,
   ),
 
   criarDisciplina(
@@ -322,7 +324,7 @@ const SEMESTRE_5: Disciplina[] = [
     "Avaliação da Aprendizagem",
     5,
     60,
-    "Fundamentos e práticas de avaliação educacional.",
+    null,
   ),
 
 ];
@@ -340,7 +342,7 @@ const SEMESTRE_6: Disciplina[] = [
     "Computação Gráfica",
     6,
     90,
-    "Fundamentos de representação e processamento gráfico.",
+    null,
   ),
 
   criarDisciplina(
@@ -349,7 +351,7 @@ const SEMESTRE_6: Disciplina[] = [
     "Desenvolvimento de Sistemas",
     6,
     90,
-    "Desenvolvimento integrado de sistemas computacionais.",
+    null,
   ),
 
   criarDisciplina(
@@ -358,7 +360,7 @@ const SEMESTRE_6: Disciplina[] = [
     "Segurança da Informação",
     6,
     60,
-    "Princípios e técnicas de segurança da informação.",
+    null,
   ),
 
   criarDisciplina(
@@ -367,7 +369,7 @@ const SEMESTRE_6: Disciplina[] = [
     "Educação Inclusiva",
     6,
     60,
-    "Princípios e práticas da educação inclusiva.",
+    null,
   ),
 
 ];
@@ -385,7 +387,7 @@ const SEMESTRE_7: Disciplina[] = [
     "Computação em Nuvem",
     7,
     90,
-    "Arquiteturas, serviços e aplicações em nuvem.",
+    null,
   ),
 
   criarDisciplina(
@@ -394,7 +396,7 @@ const SEMESTRE_7: Disciplina[] = [
     "Gestão de Projetos de Software",
     7,
     90,
-    "Planejamento e gerenciamento de projetos de software.",
+    null,
   ),
 
   criarDisciplina(
@@ -403,7 +405,7 @@ const SEMESTRE_7: Disciplina[] = [
     "Prática de Ensino em Computação",
     7,
     90,
-    "Planejamento e execução de práticas pedagógicas em Computação.",
+    null,
   ),
 
   criarDisciplina(
@@ -412,7 +414,7 @@ const SEMESTRE_7: Disciplina[] = [
     "Estágio Supervisionado",
     7,
     60,
-    "Práticas docentes supervisionadas.",
+    null,
   ),
 
 ];
@@ -430,7 +432,7 @@ const SEMESTRE_8: Disciplina[] = [
     "Tópicos Especiais em Computação",
     8,
     90,
-    "Estudo de temas atuais e emergentes da Computação.",
+    null,
   ),
 
   criarDisciplina(
@@ -439,7 +441,7 @@ const SEMESTRE_8: Disciplina[] = [
     "Empreendedorismo e Inovação",
     8,
     60,
-    "Empreendedorismo, inovação e criação de soluções tecnológicas.",
+    null,
   ),
 
   criarDisciplina(
@@ -448,7 +450,7 @@ const SEMESTRE_8: Disciplina[] = [
     "Trabalho de Conclusão de Curso",
     8,
     145,
-    "Pesquisa, desenvolvimento e apresentação do Trabalho de Conclusão de Curso.",
+    null,
   ),
 
 ];
@@ -486,6 +488,13 @@ function criarSemestre(
     finalizado: false,
 
     aprovado: false,
+
+    // ----------------------------------------------------------
+    // CORREÇÃO:
+    // Semestre exige a propriedade reprovado.
+    // ----------------------------------------------------------
+
+    reprovado: false,
 
     percentualConclusao: 0,
   };
@@ -644,4 +653,4 @@ export const CARGA_HORARIA = {
 // EXPORT DEFAULT
 // ============================================================
 
-export default CURRICULO; 
+export default CURRICULO;

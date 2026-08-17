@@ -1,143 +1,84 @@
 generator client {
-  provider = "prisma-client-js"
+provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+provider = "mysql"
 }
-
-// ============================================================
-// PROFESSOR
-// ============================================================
 
 model Professor {
-  id         String   @id @default(cuid())
-  nome       String
-  usuario    String   @unique
-  senha      String
-  disciplina String?
-  email      String?
-  ativo      Boolean  @default(true)
+id String @id @default(cuid())
+nome String
+usuario String @unique
+senha String
+disciplina String?
+email String?
+ativo Boolean @default(true)
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  atividades Atividade[]
+atividades Atividade[]
 }
-
-// ============================================================
-// ALUNO
-// ============================================================
 
 model Aluno {
-  id       String  @id @default(cuid())
-  nome     String
-  usuario  String  @unique
-  senha    String
-  idade    Int?
-  ativo    Boolean @default(true)
+id String @id @default(cuid())
+nome String
+usuario String @unique
+senha String
+idade Int?
+ativo Boolean @default(true)
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  entregas Entrega[]
+entregas Entrega[]
 }
-
-// ============================================================
-// ATIVIDADE
-// ============================================================
 
 model Atividade {
-  id String @id @default(cuid())
+id String @id @default(cuid())
+titulo String
+descricao String?
+professorId String
+disciplina String?
+semestre Int?
+prazo DateTime?
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 
-  titulo    String
-  descricao String?
-
-  professorId String
-  professor   Professor @relation(
-    fields: [professorId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  disciplina String?
-  semestre   Int?
-  prazo      DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  arquivos Arquivo[]
-  entregas Entrega[]
+professor Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+arquivos Arquivo[]
+entregas Entrega[]
 }
-
-// ============================================================
-// ENTREGA
-// ============================================================
 
 model Entrega {
-  id String @id @default(cuid())
+id String @id @default(cuid())
+atividadeId String
+alunoId String
+comentario String?
+status String @default("ENVIADA")
+nota String?
+feedback String?
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 
-  atividadeId String
-  alunoId     String
+atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+arquivos Arquivo[]
 
-  atividade Atividade @relation(
-    fields: [atividadeId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  aluno Aluno @relation(
-    fields: [alunoId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  comentario String?
-
-  status String @default("ENVIADA")
-
-  nota     String?
-  feedback String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  arquivos Arquivo[]
-
-  @@unique([atividadeId, alunoId])
+@@unique([atividadeId, alunoId])
 }
 
-// ============================================================
-// ARQUIVO
-// ============================================================
-
 model Arquivo {
-  id String @id @default(cuid())
+id String @id @default(cuid())
+nomeOriginal String
+nomeArquivo String
+caminho String
+url String
+mimeType String?
+tamanho Int?
+atividadeId String?
+entregaId String?
+createdAt DateTime @default(now())
 
-  nomeOriginal String
-  nomeArquivo  String
-
-  caminho String
-  url     String
-
-  mimeType String?
-  tamanho  Int?
-
-  atividadeId String?
-  entregaId   String?
-
-  atividade Atividade? @relation(
-    fields: [atividadeId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  entrega Entrega? @relation(
-    fields: [entregaId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  createdAt DateTime @default(now())
+atividade Atividade? @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+entrega Entrega? @relation(fields: [entregaId], references: [id], onDelete: Cascade)
 }

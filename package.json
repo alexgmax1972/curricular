@@ -9,10 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-mariadb": "^7.9.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "bootstrap": "^5.3.8",
     "lucide-react": "^1.31.0",
+    "mariadb": "^3.5.3",
     "next": "16.3.1",
     "pg": "^8.23.0",
     "prisma": "^7.9.1",

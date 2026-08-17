@@ -1,10 +1,10 @@
- "use client";
+"use client";
 
 // ============================================================
 // P.A.C.
 // Plataforma de Atividade Curricular
 //
-// app/aluno/page.tsx
+// src/app/aluno/page.tsx
 //
 // ÁREA DO ESTUDANTE
 //
@@ -22,8 +22,6 @@
 // SEMESTRE FINALIZADO
 //        ↓
 // PRÓXIMO SEMESTRE LIBERADO
-//
-// Se existir D:
 //
 // D = REPROVADO
 //        ↓
@@ -53,10 +51,6 @@ import {
   TOTAL_SEMESTRES,
 } from "../../data/curriculo";
 
-// ============================================================
-// UPLOAD DE ARQUIVOS
-// ============================================================
-
 import FileUploader from "../../components/arquivos/FileUploader";
 
 // ============================================================
@@ -70,11 +64,22 @@ type Competencia =
   | "D"
   | null;
 
+type CompetenciaValida =
+  Exclude<Competencia, null>;
+
+
 // ============================================================
 // INFORMAÇÕES DAS COMPETÊNCIAS
 // ============================================================
 
-const competenciaInfo = {
+const competenciaInfo: Record<
+  CompetenciaValida,
+  {
+    titulo: string;
+    descricao: string;
+    classe: string;
+  }
+> = {
   A: {
     titulo: "A",
     descricao: "Excelente",
@@ -98,21 +103,20 @@ const competenciaInfo = {
     descricao: "Reprovado",
     classe: "competencia-d",
   },
-} as const;
+};
+
 
 // ============================================================
 // CONCEITOS DISPONÍVEIS
 // ============================================================
 
-const CONCEITOS: Exclude<
-  Competencia,
-  null
->[] = [
+const CONCEITOS: CompetenciaValida[] = [
   "A",
   "B",
   "C",
   "D",
 ];
+
 
 // ============================================================
 // CONCEITO APROVADO
@@ -128,16 +132,14 @@ function conceitoAprovado(
   );
 }
 
+
 // ============================================================
 // CONCEITO VÁLIDO
 // ============================================================
 
 function conceitoValido(
   competencia: Competencia,
-): competencia is Exclude<
-  Competencia,
-  null
-> {
+): competencia is CompetenciaValida {
   return (
     competencia === "A" ||
     competencia === "B" ||
@@ -146,6 +148,50 @@ function conceitoValido(
   );
 }
 
+
+// ============================================================
+// OBTER COMPETÊNCIA
+//
+// Compatibilidade com dados antigos:
+//
+// Se o sistema antigo tiver A/B/C/D em "nota",
+// transferimos para "competencia".
+//
+// A propriedade nota continua numérica.
+// ============================================================
+
+function obterCompetencia(
+  disciplina: {
+    competencia?: Competencia;
+    nota?: number | null;
+  },
+): Competencia {
+
+  if (
+    disciplina.competencia === "A" ||
+    disciplina.competencia === "B" ||
+    disciplina.competencia === "C" ||
+    disciplina.competencia === "D"
+  ) {
+    return disciplina.competencia;
+  }
+
+  const valor =
+    disciplina.nota as unknown;
+
+  if (
+    valor === "A" ||
+    valor === "B" ||
+    valor === "C" ||
+    valor === "D"
+  ) {
+    return valor;
+  }
+
+  return null;
+}
+
+
 // ============================================================
 // CRIAR SEMESTRES DO ALUNO
 // ============================================================
@@ -153,6 +199,7 @@ function conceitoValido(
 function criarSemestresDoAluno(): Semestre[] {
   return CURRICULO.map(
     (semestre, index) => {
+
       const numero =
         semestre.numero ??
         index + 1;
@@ -176,13 +223,21 @@ function criarSemestresDoAluno(): Semestre[] {
         aprovado:
           false,
 
+        reprovado:
+          false,
+
         percentualConclusao:
           0,
 
         disciplinas:
           semestre.disciplinas.map(
             (disciplina) => ({
+
               ...disciplina,
+
+              competencia:
+                disciplina.competencia ??
+                null,
 
               nota:
                 disciplina.nota ??
@@ -194,14 +249,18 @@ function criarSemestresDoAluno(): Semestre[] {
               finalizada:
                 false,
 
+              reprovada:
+                false,
+
               status:
-                "PENDENTE",
+                "PENDENTE" as const,
             }),
           ),
       };
     },
   );
 }
+
 
 // ============================================================
 // CRIAR ALUNO INICIAL
@@ -241,6 +300,7 @@ function criarAlunoInicial(): Aluno {
   };
 }
 
+
 // ============================================================
 // NORMALIZAR ALUNO
 // ============================================================
@@ -248,6 +308,7 @@ function criarAlunoInicial(): Aluno {
 function normalizarAluno(
   alunoSalvo: Aluno,
 ): Aluno {
+
   const semestresBase =
     criarSemestresDoAluno();
 
@@ -261,6 +322,7 @@ function normalizarAluno(
   const semestres =
     semestresBase.map(
       (base) => {
+
         const salvo =
           semestresSalvos.find(
             (item) =>
@@ -283,6 +345,7 @@ function normalizarAluno(
           disciplinas:
             base.disciplinas.map(
               (disciplinaBase) => {
+
                 const disciplinaSalva =
                   Array.isArray(
                     salvo.disciplinas,
@@ -300,37 +363,50 @@ function normalizarAluno(
                   return disciplinaBase;
                 }
 
-                const nota =
-                  disciplinaSalva.nota ??
-                  null;
+                const competencia =
+                  obterCompetencia(
+                    disciplinaSalva,
+                  );
 
                 const aprovada =
                   conceitoAprovado(
-                    nota as Competencia,
+                    competencia,
                   );
 
                 const finalizada =
                   conceitoValido(
-                    nota as Competencia,
+                    competencia,
                   );
+
+                const reprovada =
+                  competencia ===
+                  "D";
 
                 return {
                   ...disciplinaBase,
 
                   ...disciplinaSalva,
 
-                  nota,
+                  competencia,
+
+                  nota:
+                    typeof disciplinaSalva.nota ===
+                    "number"
+                      ? disciplinaSalva.nota
+                      : null,
 
                   aprovada,
 
                   finalizada,
 
+                  reprovada,
+
                   status:
-                    nota === "D"
-                      ? "REPROVADA"
+                    competencia === "D"
+                      ? "REPROVADA" as const
                       : aprovada
-                        ? "APROVADA"
-                        : "PENDENTE",
+                        ? "APROVADA" as const
+                        : "PENDENTE" as const,
                 };
               },
             ),
@@ -364,15 +440,19 @@ function normalizarAluno(
   };
 }
 
+
 // ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
 
 export default function AlunoPage() {
+
   const [
     aluno,
     setAluno,
-  ] = useState<Aluno | null>(null);
+  ] = useState<Aluno | null>(
+    null,
+  );
 
   const [
     menuAberto,
@@ -393,18 +473,22 @@ export default function AlunoPage() {
     "info"
   >("info");
 
+
   // ==========================================================
   // CARREGAR ALUNO
   // ==========================================================
 
   useEffect(() => {
+
     try {
+
       const salvo =
         localStorage.getItem(
           "pac_aluno",
         );
 
       if (salvo) {
+
         const alunoSalvo =
           JSON.parse(
             salvo,
@@ -428,12 +512,15 @@ export default function AlunoPage() {
 
         return;
       }
+
     } catch (error) {
+
       console.error(
         "Erro ao carregar aluno:",
         error,
       );
     }
+
 
     const novoAluno =
       criarAlunoInicial();
@@ -448,7 +535,9 @@ export default function AlunoPage() {
     setAluno(
       novoAluno,
     );
+
   }, []);
+
 
   // ==========================================================
   // SEMESTRE ATUAL
@@ -456,6 +545,7 @@ export default function AlunoPage() {
 
   const semestreAtual =
     useMemo(() => {
+
       if (!aluno) {
         return undefined;
       }
@@ -463,7 +553,9 @@ export default function AlunoPage() {
       return obterSemestreAtual(
         aluno,
       );
+
     }, [aluno]);
+
 
   // ==========================================================
   // PROGRESSO
@@ -471,6 +563,7 @@ export default function AlunoPage() {
 
   const progresso =
     useMemo(() => {
+
       if (!aluno) {
         return 0;
       }
@@ -478,7 +571,9 @@ export default function AlunoPage() {
       return obterProgressoCurso(
         aluno,
       );
+
     }, [aluno]);
+
 
   // ==========================================================
   // ESTATÍSTICAS
@@ -486,7 +581,9 @@ export default function AlunoPage() {
 
   const estatisticas =
     useMemo(() => {
+
       if (!semestreAtual) {
+
         return {
           total: 0,
           aprovadas: 0,
@@ -495,10 +592,12 @@ export default function AlunoPage() {
         };
       }
 
+
       const total =
         semestreAtual
           .disciplinas
           .length;
+
 
       const aprovadas =
         semestreAtual
@@ -510,16 +609,18 @@ export default function AlunoPage() {
           )
           .length;
 
+
       const reprovadas =
         semestreAtual
           .disciplinas
           .filter(
             (disciplina) =>
-              disciplina.nota === "D" ||
-              disciplina.status ===
-                "REPROVADA",
+              obterCompetencia(
+                disciplina,
+              ) === "D",
           )
           .length;
+
 
       const pendentes =
         Math.max(
@@ -529,13 +630,16 @@ export default function AlunoPage() {
             reprovadas,
         );
 
+
       return {
         total,
         aprovadas,
         reprovadas,
         pendentes,
       };
+
     }, [semestreAtual]);
+
 
   // ==========================================================
   // TODAS APROVADAS
@@ -543,6 +647,7 @@ export default function AlunoPage() {
 
   const todasAprovadas =
     useMemo(() => {
+
       if (!semestreAtual) {
         return false;
       }
@@ -560,10 +665,14 @@ export default function AlunoPage() {
         .every(
           (disciplina) =>
             conceitoAprovado(
-              disciplina.nota as Competencia,
+              obterCompetencia(
+                disciplina,
+              ),
             ),
         );
+
     }, [semestreAtual]);
+
 
   // ==========================================================
   // SEMESTRE POSSUI D
@@ -571,6 +680,7 @@ export default function AlunoPage() {
 
   const possuiReprovacao =
     useMemo(() => {
+
       if (!semestreAtual) {
         return false;
       }
@@ -579,9 +689,13 @@ export default function AlunoPage() {
         .disciplinas
         .some(
           (disciplina) =>
-            disciplina.nota === "D",
+            obterCompetencia(
+              disciplina,
+            ) === "D",
         );
+
     }, [semestreAtual]);
+
 
   // ==========================================================
   // SALVAR ALUNO
@@ -590,18 +704,22 @@ export default function AlunoPage() {
   function salvarAluno(
     novoAluno: Aluno,
   ) {
+
     setAluno(
       novoAluno,
     );
 
     try {
+
       localStorage.setItem(
         "pac_aluno",
         JSON.stringify(
           novoAluno,
         ),
       );
+
     } catch (error) {
+
       console.error(
         "Erro ao salvar aluno:",
         error,
@@ -617,20 +735,20 @@ export default function AlunoPage() {
     }
   }
 
+
   // ==========================================================
   // ALTERAR COMPETÊNCIA
   // ==========================================================
 
   function alterarCompetencia(
     disciplinaId: string,
-    competencia: Exclude<
-      Competencia,
-      null
-    >,
+    competencia: CompetenciaValida,
   ) {
+
     if (!aluno) {
       return;
     }
+
 
     const semestreDoAluno =
       aluno.semestres.find(
@@ -639,7 +757,9 @@ export default function AlunoPage() {
           aluno.semestreAtual,
       );
 
+
     if (!semestreDoAluno) {
+
       setTipoMensagem(
         "erro",
       );
@@ -651,9 +771,11 @@ export default function AlunoPage() {
       return;
     }
 
+
     if (
       semestreDoAluno.finalizado
     ) {
+
       setTipoMensagem(
         "info",
       );
@@ -665,14 +787,21 @@ export default function AlunoPage() {
       return;
     }
 
+
     const aprovada =
       conceitoAprovado(
         competencia,
       );
 
+
+    const reprovada =
+      competencia === "D";
+
+
     const novosSemestres =
       aluno.semestres.map(
         (semestre) => {
+
           if (
             semestre.numero !==
             aluno.semestreAtual
@@ -680,9 +809,11 @@ export default function AlunoPage() {
             return semestre;
           }
 
+
           const novasDisciplinas =
             semestre.disciplinas.map(
               (disciplina) => {
+
                 if (
                   disciplina.id !==
                   disciplinaId
@@ -690,46 +821,62 @@ export default function AlunoPage() {
                   return disciplina;
                 }
 
+
                 return {
+
                   ...disciplina,
 
+                  competencia,
+
                   nota:
-                    competencia,
+                    disciplina.nota ??
+                    null,
 
                   aprovada,
 
                   finalizada:
                     true,
 
+                  reprovada,
+
                   status:
-                    aprovada
-                      ? "APROVADA"
-                      : "REPROVADA",
+                    reprovada
+                      ? "REPROVADA" as const
+                      : "APROVADA" as const,
                 };
               },
             );
 
+
           const total =
             novasDisciplinas.length;
+
 
           const quantidadeFinalizada =
             novasDisciplinas.filter(
               (disciplina) =>
                 conceitoValido(
-                  disciplina.nota as Competencia,
+                  obterCompetencia(
+                    disciplina,
+                  ),
                 ),
             ).length;
+
 
           const percentual =
             total > 0
               ? Math.round(
-                  (quantidadeFinalizada /
-                    total) *
+                  (
+                    quantidadeFinalizada /
+                    total
+                  ) *
                     100,
                 )
               : 0;
 
+
           return {
+
             ...semestre,
 
             finalizado:
@@ -738,8 +885,16 @@ export default function AlunoPage() {
             aprovado:
               false,
 
+            reprovado:
+              novasDisciplinas.some(
+                (disciplina) =>
+                  obterCompetencia(
+                    disciplina,
+                  ) === "D",
+              ),
+
             status:
-              "EM_ANDAMENTO",
+              "EM_ANDAMENTO" as const,
 
             percentualConclusao:
               percentual,
@@ -750,20 +905,25 @@ export default function AlunoPage() {
         },
       );
 
+
     const novoAluno: Aluno = {
+
       ...aluno,
 
       semestres:
         novosSemestres,
     };
 
+
     salvarAluno(
       novoAluno,
     );
 
+
     if (
       competencia === "D"
     ) {
+
       setTipoMensagem(
         "erro",
       );
@@ -775,6 +935,7 @@ export default function AlunoPage() {
       return;
     }
 
+
     setTipoMensagem(
       "sucesso",
     );
@@ -784,11 +945,13 @@ export default function AlunoPage() {
     );
   }
 
+
   // ==========================================================
   // FINALIZAR SEMESTRE
   // ==========================================================
 
   function finalizarSemestre() {
+
     if (
       !aluno ||
       !semestreAtual
@@ -796,9 +959,11 @@ export default function AlunoPage() {
       return;
     }
 
+
     if (
       semestreAtual.finalizado
     ) {
+
       setTipoMensagem(
         "info",
       );
@@ -810,12 +975,15 @@ export default function AlunoPage() {
       return;
     }
 
+
     const disciplinas =
       semestreAtual.disciplinas;
+
 
     if (
       disciplinas.length === 0
     ) {
+
       setTipoMensagem(
         "erro",
       );
@@ -827,23 +995,31 @@ export default function AlunoPage() {
       return;
     }
 
+
     const pendentes =
       disciplinas.filter(
         (disciplina) =>
           !conceitoValido(
-            disciplina.nota as Competencia,
+            obterCompetencia(
+              disciplina,
+            ),
           ),
       );
+
 
     const reprovadas =
       disciplinas.filter(
         (disciplina) =>
-          disciplina.nota === "D",
+          obterCompetencia(
+            disciplina,
+          ) === "D",
       );
+
 
     if (
       reprovadas.length > 0
     ) {
+
       setTipoMensagem(
         "erro",
       );
@@ -855,9 +1031,11 @@ export default function AlunoPage() {
       return;
     }
 
+
     if (
       pendentes.length > 0
     ) {
+
       setTipoMensagem(
         "info",
       );
@@ -869,15 +1047,20 @@ export default function AlunoPage() {
       return;
     }
 
+
     const aprovadas =
       disciplinas.every(
         (disciplina) =>
           conceitoAprovado(
-            disciplina.nota as Competencia,
+            obterCompetencia(
+              disciplina,
+            ),
           ),
       );
 
+
     if (!aprovadas) {
+
       setTipoMensagem(
         "erro",
       );
@@ -889,28 +1072,35 @@ export default function AlunoPage() {
       return;
     }
 
+
     const numeroAtual =
       aluno.semestreAtual;
 
+
     const proximoNumero =
       numeroAtual + 1;
+
 
     const existemMaisSemestres =
       proximoNumero <=
       TOTAL_SEMESTRES;
 
+
     const novosSemestres =
       aluno.semestres.map(
         (semestre) => {
-          // ================================================
+
+          // ==================================================
           // SEMESTRE ATUAL
-          // ================================================
+          // ==================================================
 
           if (
             semestre.numero ===
             numeroAtual
           ) {
+
             return {
+
               ...semestre,
 
               finalizado:
@@ -919,11 +1109,14 @@ export default function AlunoPage() {
               aprovado:
                 true,
 
+              reprovado:
+                false,
+
               iniciado:
                 true,
 
               status:
-                "FINALIZADO",
+                "FINALIZADO" as const,
 
               percentualConclusao:
                 100,
@@ -931,6 +1124,7 @@ export default function AlunoPage() {
               disciplinas:
                 semestre.disciplinas.map(
                   (disciplina) => ({
+
                     ...disciplina,
 
                     aprovada:
@@ -939,26 +1133,32 @@ export default function AlunoPage() {
                     finalizada:
                       true,
 
+                    reprovada:
+                      false,
+
                     status:
-                      "APROVADA",
+                      "APROVADA" as const,
                   }),
                 ),
             };
           }
 
-          // ================================================
+
+          // ==================================================
           // PRÓXIMO SEMESTRE
-          // ================================================
+          // ==================================================
 
           if (
             semestre.numero ===
             proximoNumero
           ) {
+
             return {
+
               ...semestre,
 
               status:
-                "DISPONIVEL",
+                "DISPONIVEL" as const,
 
               iniciado:
                 true,
@@ -968,14 +1168,20 @@ export default function AlunoPage() {
 
               aprovado:
                 false,
+
+              reprovado:
+                false,
             };
           }
+
 
           return semestre;
         },
       );
 
+
     const novoAluno: Aluno = {
+
       ...aluno,
 
       semestreAtual:
@@ -987,13 +1193,16 @@ export default function AlunoPage() {
         novosSemestres,
     };
 
+
     salvarAluno(
       novoAluno,
     );
 
+
     if (
       !existemMaisSemestres
     ) {
+
       setTipoMensagem(
         "sucesso",
       );
@@ -1005,6 +1214,7 @@ export default function AlunoPage() {
       return;
     }
 
+
     setTipoMensagem(
       "sucesso",
     );
@@ -1014,11 +1224,13 @@ export default function AlunoPage() {
     );
   }
 
+
   // ==========================================================
   // SAIR
   // ==========================================================
 
   function sair() {
+
     localStorage.removeItem(
       "pac_sessao",
     );
@@ -1027,12 +1239,15 @@ export default function AlunoPage() {
       "/login";
   }
 
+
   // ==========================================================
   // LOADING
   // ==========================================================
 
   if (!aluno) {
+
     return (
+
       <main className="loading">
 
         <div className="loading-box">
@@ -1053,11 +1268,13 @@ export default function AlunoPage() {
     );
   }
 
+
   // ==========================================================
   // RENDER
   // ==========================================================
 
   return (
+
     <main className="pac-page">
 
       {/* ================================================== */}
@@ -1085,6 +1302,7 @@ export default function AlunoPage() {
           </div>
 
         </div>
+
 
         <div className="user-area">
 
@@ -1120,7 +1338,9 @@ export default function AlunoPage() {
 
           </button>
 
+
           {menuAberto && (
+
             <div className="user-menu">
 
               <button
@@ -1142,11 +1362,13 @@ export default function AlunoPage() {
               </button>
 
             </div>
+
           )}
 
         </div>
 
       </header>
+
 
       {/* ================================================== */}
       {/* CONTEÚDO */}
@@ -1177,6 +1399,7 @@ export default function AlunoPage() {
 
           </div>
 
+
           <div className="semester-badge">
 
             <span>
@@ -1191,11 +1414,13 @@ export default function AlunoPage() {
 
         </div>
 
+
         {/* ================================================= */}
         {/* MENSAGEM */}
         {/* ================================================= */}
 
         {mensagem && (
+
           <div
             className={
               `message ${tipoMensagem}`
@@ -1217,7 +1442,9 @@ export default function AlunoPage() {
             </button>
 
           </div>
+
         )}
+
 
         {/* ================================================= */}
         {/* CARDS */}
@@ -1243,6 +1470,7 @@ export default function AlunoPage() {
 
           </div>
 
+
           <div className="card">
 
             <span>
@@ -1260,6 +1488,7 @@ export default function AlunoPage() {
 
           </div>
 
+
           <div className="card">
 
             <span>
@@ -1275,6 +1504,7 @@ export default function AlunoPage() {
             </small>
 
           </div>
+
 
           <div className="card">
 
@@ -1293,6 +1523,7 @@ export default function AlunoPage() {
           </div>
 
         </div>
+
 
         {/* ================================================= */}
         {/* PROGRESSO DO CURSO */}
@@ -1320,6 +1551,7 @@ export default function AlunoPage() {
 
           </div>
 
+
           <div className="progress">
 
             <div
@@ -1331,6 +1563,7 @@ export default function AlunoPage() {
             />
 
           </div>
+
 
           <div className="semester-road">
 
@@ -1344,6 +1577,7 @@ export default function AlunoPage() {
                 const numero =
                   index + 1;
 
+
                 const semestre =
                   aluno.semestres.find(
                     (item) =>
@@ -1351,9 +1585,11 @@ export default function AlunoPage() {
                       numero,
                   );
 
+
                 const concluido =
                   semestre?.finalizado ??
                   false;
+
 
                 const liberado =
                   semestre?.status ===
@@ -1365,7 +1601,9 @@ export default function AlunoPage() {
                   numero <=
                     aluno.semestreAtual;
 
+
                 return (
+
                   <div
                     key={numero}
                     className={
@@ -1402,8 +1640,9 @@ export default function AlunoPage() {
 
         </section>
 
+
         {/* ================================================= */}
-        {/* ARQUIVOS DO ALUNO */}
+        {/* ARQUIVOS */}
         {/* ================================================= */}
 
         <section className="panel files-panel">
@@ -1427,11 +1666,13 @@ export default function AlunoPage() {
 
             </div>
 
+
             <div className="files-icon">
               📁
             </div>
 
           </div>
+
 
           <div className="file-uploader-container">
 
@@ -1441,11 +1682,13 @@ export default function AlunoPage() {
 
         </section>
 
+
         {/* ================================================= */}
         {/* SEMESTRE ATUAL */}
         {/* ================================================= */}
 
         {semestreAtual && (
+
           <section className="panel">
 
             <div className="panel-header">
@@ -1461,6 +1704,7 @@ export default function AlunoPage() {
                 </h2>
 
               </div>
+
 
               <div
                 className={
@@ -1488,9 +1732,10 @@ export default function AlunoPage() {
 
             </div>
 
-            {/* ============================================= */}
+
+            {/* ================================================= */}
             {/* DISCIPLINAS */}
-            {/* ============================================= */}
+            {/* ================================================= */}
 
             <div className="discipline-list">
 
@@ -1515,17 +1760,23 @@ export default function AlunoPage() {
                   (disciplina) => {
 
                     const conceito =
-                      disciplina.nota as Competencia;
+                      obterCompetencia(
+                        disciplina,
+                      );
+
 
                     const disciplinaAprovada =
                       conceitoAprovado(
                         conceito,
                       );
 
+
                     const disciplinaReprovada =
                       conceito === "D";
 
+
                     return (
+
                       <article
                         key={
                           disciplina.id
@@ -1558,11 +1809,13 @@ export default function AlunoPage() {
 
                         </div>
 
+
                         <div className="competencia-area">
 
                           <span>
                             COMPETÊNCIA
                           </span>
+
 
                           <div className="competencias">
 
@@ -1606,6 +1859,7 @@ export default function AlunoPage() {
 
                         </div>
 
+
                         <div
                           className={
                             `result ${
@@ -1634,6 +1888,7 @@ export default function AlunoPage() {
               )}
 
             </div>
+
 
             {/* ================================================= */}
             {/* FINALIZAÇÃO */}
@@ -1665,6 +1920,7 @@ export default function AlunoPage() {
                   </strong>.
                 </p>
 
+
                 <div className="finish-status">
 
                   <span
@@ -1688,6 +1944,7 @@ export default function AlunoPage() {
                 </div>
 
               </div>
+
 
               <button
                 type="button"
@@ -1714,6 +1971,7 @@ export default function AlunoPage() {
           </section>
         )}
 
+
         {/* ================================================= */}
         {/* SISTEMA DE AVALIAÇÃO */}
         {/* ================================================= */}
@@ -1736,6 +1994,7 @@ export default function AlunoPage() {
 
           </div>
 
+
           <div className="legend">
 
             {CONCEITOS.map(
@@ -1753,6 +2012,7 @@ export default function AlunoPage() {
                   >
                     {item}
                   </div>
+
 
                   <div>
 
@@ -1779,6 +2039,7 @@ export default function AlunoPage() {
 
       </section>
 
+
       {/* ================================================== */}
       {/* CSS */}
       {/* ================================================== */}
@@ -1799,10 +2060,6 @@ export default function AlunoPage() {
             Helvetica,
             sans-serif;
         }
-
-        /* ==================================================
-           TOPBAR
-        ================================================== */
 
         .topbar {
           height: 76px;
@@ -1868,10 +2125,6 @@ export default function AlunoPage() {
           color: #71808a;
           font-size: 12px;
         }
-
-        /* ==================================================
-           USUÁRIO
-        ================================================== */
 
         .user-area {
           position: relative;
@@ -1958,10 +2211,6 @@ export default function AlunoPage() {
           background: #f1f5f3;
         }
 
-        /* ==================================================
-           CONTEÚDO
-        ================================================== */
-
         .content {
           width:
             min(
@@ -1975,10 +2224,6 @@ export default function AlunoPage() {
           padding:
             36px 0 70px;
         }
-
-        /* ==================================================
-           WELCOME
-        ================================================== */
 
         .welcome {
           display: flex;
@@ -2057,10 +2302,6 @@ export default function AlunoPage() {
           margin-top: 3px;
         }
 
-        /* ==================================================
-           MENSAGENS
-        ================================================== */
-
         .message {
           padding:
             14px 16px;
@@ -2123,10 +2364,6 @@ export default function AlunoPage() {
 
           color: inherit;
         }
-
-        /* ==================================================
-           CARDS
-        ================================================== */
 
         .cards {
           display: grid;
@@ -2191,10 +2428,6 @@ export default function AlunoPage() {
           font-size: 12px;
         }
 
-        /* ==================================================
-           PAINÉIS
-        ================================================== */
-
         .panel {
           background: #ffffff;
 
@@ -2247,10 +2480,6 @@ export default function AlunoPage() {
           font-size: 12px;
         }
 
-        /* ==================================================
-           ARQUIVOS
-        ================================================== */
-
         .files-panel {
           overflow: hidden;
         }
@@ -2283,10 +2512,6 @@ export default function AlunoPage() {
           overflow: hidden;
         }
 
-        /* ==================================================
-           PROGRESSO
-        ================================================== */
-
         .progress {
           width: 100%;
 
@@ -2309,10 +2534,6 @@ export default function AlunoPage() {
           transition:
             width .4s ease;
         }
-
-        /* ==================================================
-           CAMINHO DOS SEMESTRES
-        ================================================== */
 
         .semester-road {
           display: grid;
@@ -2394,10 +2615,6 @@ export default function AlunoPage() {
           color: #a4afb5;
         }
 
-        /* ==================================================
-           STATUS DO SEMESTRE
-        ================================================== */
-
         .semester-status {
           font-size: 10px;
 
@@ -2429,10 +2646,6 @@ export default function AlunoPage() {
 
           background: #fae8e6;
         }
-
-        /* ==================================================
-           DISCIPLINAS
-        ================================================== */
 
         .discipline-list {
           display: flex;
@@ -2504,10 +2717,6 @@ export default function AlunoPage() {
 
           font-size: 12px;
         }
-
-        /* ==================================================
-           COMPETÊNCIAS
-        ================================================== */
 
         .competencia-area {
           display: flex;
@@ -2603,10 +2812,6 @@ export default function AlunoPage() {
             #c0392b !important;
         }
 
-        /* ==================================================
-           RESULTADO
-        ================================================== */
-
         .result {
           min-width: 115px;
 
@@ -2640,10 +2845,6 @@ export default function AlunoPage() {
           color: #74828a;
         }
 
-        /* ==================================================
-           ESTADO VAZIO
-        ================================================== */
-
         .empty-state {
           padding: 30px;
 
@@ -2672,10 +2873,6 @@ export default function AlunoPage() {
 
           font-size: 12px;
         }
-
-        /* ==================================================
-           FINALIZAÇÃO
-        ================================================== */
 
         .finish-area {
           margin-top: 22px;
@@ -2785,10 +2982,6 @@ export default function AlunoPage() {
           cursor: not-allowed;
         }
 
-        /* ==================================================
-           LEGENDA
-        ================================================== */
-
         .legend {
           display: grid;
 
@@ -2850,10 +3043,6 @@ export default function AlunoPage() {
           font-size: 10px;
         }
 
-        /* ==================================================
-           LOADING
-        ================================================== */
-
         .loading {
           min-height: 100vh;
 
@@ -2908,10 +3097,6 @@ export default function AlunoPage() {
           }
         }
 
-        /* ==================================================
-           TABLET
-        ================================================== */
-
         @media (max-width: 900px) {
 
           .cards {
@@ -2942,12 +3127,7 @@ export default function AlunoPage() {
                 1fr
               );
           }
-
         }
-
-        /* ==================================================
-           CELULAR
-        ================================================== */
 
         @media (max-width: 600px) {
 
@@ -3087,7 +3267,6 @@ export default function AlunoPage() {
           .files-icon {
             display: none;
           }
-
         }
 
       `}</style>
