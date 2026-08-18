@@ -15,19 +15,7 @@
 // C = PASSOU
 // D = REPROVADO
 //
-// REGRA:
-//
-// A, B ou C em todas as disciplinas
-//        ↓
-// SEMESTRE FINALIZADO
-//        ↓
-// PRÓXIMO SEMESTRE LIBERADO
-//
-// D = REPROVADO
-//        ↓
-// SEMESTRE NÃO FINALIZADO
-//        ↓
-// PRÓXIMO SEMESTRE BLOQUEADO
+// CONFIGURAÇÕES DO ALUNO
 // ============================================================
 
 import {
@@ -67,6 +55,30 @@ type Competencia =
 type CompetenciaValida =
   Exclude<Competencia, null>;
 
+type TipoMensagem =
+  | "sucesso"
+  | "erro"
+  | "info";
+
+interface ConfiguracoesAluno {
+  nomeExibicao: string;
+  notificacoes: boolean;
+  lembretesAcademicos: boolean;
+  confirmarSaida: boolean;
+  densidade: "normal" | "compacta";
+}
+
+// ============================================================
+// CONFIGURAÇÕES PADRÃO
+// ============================================================
+
+const CONFIGURACOES_PADRAO: ConfiguracoesAluno = {
+  nomeExibicao: "",
+  notificacoes: true,
+  lembretesAcademicos: true,
+  confirmarSaida: false,
+  densidade: "normal",
+};
 
 // ============================================================
 // INFORMAÇÕES DAS COMPETÊNCIAS
@@ -105,7 +117,6 @@ const competenciaInfo: Record<
   },
 };
 
-
 // ============================================================
 // CONCEITOS DISPONÍVEIS
 // ============================================================
@@ -116,7 +127,6 @@ const CONCEITOS: CompetenciaValida[] = [
   "C",
   "D",
 ];
-
 
 // ============================================================
 // CONCEITO APROVADO
@@ -131,7 +141,6 @@ function conceitoAprovado(
     competencia === "C"
   );
 }
-
 
 // ============================================================
 // CONCEITO VÁLIDO
@@ -148,16 +157,8 @@ function conceitoValido(
   );
 }
 
-
 // ============================================================
 // OBTER COMPETÊNCIA
-//
-// Compatibilidade com dados antigos:
-//
-// Se o sistema antigo tiver A/B/C/D em "nota",
-// transferimos para "competencia".
-//
-// A propriedade nota continua numérica.
 // ============================================================
 
 function obterCompetencia(
@@ -191,12 +192,12 @@ function obterCompetencia(
   return null;
 }
 
-
 // ============================================================
 // CRIAR SEMESTRES DO ALUNO
 // ============================================================
 
 function criarSemestresDoAluno(): Semestre[] {
+
   return CURRICULO.map(
     (semestre, index) => {
 
@@ -261,12 +262,12 @@ function criarSemestresDoAluno(): Semestre[] {
   );
 }
 
-
 // ============================================================
 // CRIAR ALUNO INICIAL
 // ============================================================
 
 function criarAlunoInicial(): Aluno {
+
   return {
     id:
       "aluno-001",
@@ -299,7 +300,6 @@ function criarAlunoInicial(): Aluno {
       new Date().toISOString(),
   };
 }
-
 
 // ============================================================
 // NORMALIZAR ALUNO
@@ -440,7 +440,6 @@ function normalizarAluno(
   };
 }
 
-
 // ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
@@ -459,6 +458,29 @@ export default function AlunoPage() {
     setMenuAberto,
   ] = useState(false);
 
+  // ==========================================================
+  // CONFIGURAÇÕES
+  // ==========================================================
+
+  const [
+    configuracoes,
+    setConfiguracoes,
+  ] = useState<ConfiguracoesAluno>(
+    CONFIGURACOES_PADRAO,
+  );
+
+  const [
+    configuracoesAbertas,
+    setConfiguracoesAbertas,
+  ] = useState(false);
+
+  const [
+    configuracoesEditadas,
+    setConfiguracoesEditadas,
+  ] = useState<ConfiguracoesAluno>(
+    CONFIGURACOES_PADRAO,
+  );
+
   const [
     mensagem,
     setMensagem,
@@ -467,12 +489,7 @@ export default function AlunoPage() {
   const [
     tipoMensagem,
     setTipoMensagem,
-  ] = useState<
-    "sucesso" |
-    "erro" |
-    "info"
-  >("info");
-
+  ] = useState<TipoMensagem>("info");
 
   // ==========================================================
   // CARREGAR ALUNO
@@ -510,7 +527,21 @@ export default function AlunoPage() {
           ),
         );
 
-        return;
+      } else {
+
+        const novoAluno =
+          criarAlunoInicial();
+
+        localStorage.setItem(
+          "pac_aluno",
+          JSON.stringify(
+            novoAluno,
+          ),
+        );
+
+        setAluno(
+          novoAluno,
+        );
       }
 
     } catch (error) {
@@ -519,25 +550,68 @@ export default function AlunoPage() {
         "Erro ao carregar aluno:",
         error,
       );
-    }
 
+      const novoAluno =
+        criarAlunoInicial();
 
-    const novoAluno =
-      criarAlunoInicial();
-
-    localStorage.setItem(
-      "pac_aluno",
-      JSON.stringify(
+      setAluno(
         novoAluno,
-      ),
-    );
-
-    setAluno(
-      novoAluno,
-    );
+      );
+    }
 
   }, []);
 
+  // ==========================================================
+  // CARREGAR CONFIGURAÇÕES
+  // ==========================================================
+
+  useEffect(() => {
+
+    try {
+
+      const salvo =
+        localStorage.getItem(
+          "pac_configuracoes_aluno",
+        );
+
+      if (salvo) {
+
+        const configuracoesSalvas =
+          JSON.parse(
+            salvo,
+          ) as Partial<ConfiguracoesAluno>;
+
+        const configuracoesCompletas: ConfiguracoesAluno = {
+          ...CONFIGURACOES_PADRAO,
+          ...configuracoesSalvas,
+        };
+
+        setConfiguracoes(
+          configuracoesCompletas,
+        );
+
+        setConfiguracoesEditadas(
+          configuracoesCompletas,
+        );
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao carregar configurações:",
+        error,
+      );
+
+      setConfiguracoes(
+        CONFIGURACOES_PADRAO,
+      );
+
+      setConfiguracoesEditadas(
+        CONFIGURACOES_PADRAO,
+      );
+    }
+
+  }, []);
 
   // ==========================================================
   // SEMESTRE ATUAL
@@ -556,7 +630,6 @@ export default function AlunoPage() {
 
     }, [aluno]);
 
-
   // ==========================================================
   // PROGRESSO
   // ==========================================================
@@ -573,7 +646,6 @@ export default function AlunoPage() {
       );
 
     }, [aluno]);
-
 
   // ==========================================================
   // ESTATÍSTICAS
@@ -592,12 +664,10 @@ export default function AlunoPage() {
         };
       }
 
-
       const total =
         semestreAtual
           .disciplinas
           .length;
-
 
       const aprovadas =
         semestreAtual
@@ -608,7 +678,6 @@ export default function AlunoPage() {
               true,
           )
           .length;
-
 
       const reprovadas =
         semestreAtual
@@ -621,7 +690,6 @@ export default function AlunoPage() {
           )
           .length;
 
-
       const pendentes =
         Math.max(
           0,
@@ -629,7 +697,6 @@ export default function AlunoPage() {
             aprovadas -
             reprovadas,
         );
-
 
       return {
         total,
@@ -639,7 +706,6 @@ export default function AlunoPage() {
       };
 
     }, [semestreAtual]);
-
 
   // ==========================================================
   // TODAS APROVADAS
@@ -673,7 +739,6 @@ export default function AlunoPage() {
 
     }, [semestreAtual]);
 
-
   // ==========================================================
   // SEMESTRE POSSUI D
   // ==========================================================
@@ -696,6 +761,14 @@ export default function AlunoPage() {
 
     }, [semestreAtual]);
 
+  // ==========================================================
+  // NOME DE EXIBIÇÃO
+  // ==========================================================
+
+  const nomeExibicao =
+    configuracoes.nomeExibicao.trim() ||
+    aluno?.nomeCompleto ||
+    "Aluno";
 
   // ==========================================================
   // SALVAR ALUNO
@@ -735,7 +808,6 @@ export default function AlunoPage() {
     }
   }
 
-
   // ==========================================================
   // ALTERAR COMPETÊNCIA
   // ==========================================================
@@ -749,14 +821,12 @@ export default function AlunoPage() {
       return;
     }
 
-
     const semestreDoAluno =
       aluno.semestres.find(
         (semestre) =>
           semestre.numero ===
           aluno.semestreAtual,
       );
-
 
     if (!semestreDoAluno) {
 
@@ -770,7 +840,6 @@ export default function AlunoPage() {
 
       return;
     }
-
 
     if (
       semestreDoAluno.finalizado
@@ -787,16 +856,13 @@ export default function AlunoPage() {
       return;
     }
 
-
     const aprovada =
       conceitoAprovado(
         competencia,
       );
 
-
     const reprovada =
       competencia === "D";
-
 
     const novosSemestres =
       aluno.semestres.map(
@@ -809,7 +875,6 @@ export default function AlunoPage() {
             return semestre;
           }
 
-
           const novasDisciplinas =
             semestre.disciplinas.map(
               (disciplina) => {
@@ -820,7 +885,6 @@ export default function AlunoPage() {
                 ) {
                   return disciplina;
                 }
-
 
                 return {
 
@@ -847,10 +911,8 @@ export default function AlunoPage() {
               },
             );
 
-
           const total =
             novasDisciplinas.length;
-
 
           const quantidadeFinalizada =
             novasDisciplinas.filter(
@@ -862,7 +924,6 @@ export default function AlunoPage() {
                 ),
             ).length;
 
-
           const percentual =
             total > 0
               ? Math.round(
@@ -873,7 +934,6 @@ export default function AlunoPage() {
                     100,
                 )
               : 0;
-
 
           return {
 
@@ -905,7 +965,6 @@ export default function AlunoPage() {
         },
       );
 
-
     const novoAluno: Aluno = {
 
       ...aluno,
@@ -914,11 +973,9 @@ export default function AlunoPage() {
         novosSemestres,
     };
 
-
     salvarAluno(
       novoAluno,
     );
-
 
     if (
       competencia === "D"
@@ -935,7 +992,6 @@ export default function AlunoPage() {
       return;
     }
 
-
     setTipoMensagem(
       "sucesso",
     );
@@ -944,7 +1000,6 @@ export default function AlunoPage() {
       `Conceito ${competencia} registrado. Disciplina aprovada.`,
     );
   }
-
 
   // ==========================================================
   // FINALIZAR SEMESTRE
@@ -958,7 +1013,6 @@ export default function AlunoPage() {
     ) {
       return;
     }
-
 
     if (
       semestreAtual.finalizado
@@ -975,10 +1029,8 @@ export default function AlunoPage() {
       return;
     }
 
-
     const disciplinas =
       semestreAtual.disciplinas;
-
 
     if (
       disciplinas.length === 0
@@ -995,7 +1047,6 @@ export default function AlunoPage() {
       return;
     }
 
-
     const pendentes =
       disciplinas.filter(
         (disciplina) =>
@@ -1006,7 +1057,6 @@ export default function AlunoPage() {
           ),
       );
 
-
     const reprovadas =
       disciplinas.filter(
         (disciplina) =>
@@ -1014,7 +1064,6 @@ export default function AlunoPage() {
             disciplina,
           ) === "D",
       );
-
 
     if (
       reprovadas.length > 0
@@ -1031,7 +1080,6 @@ export default function AlunoPage() {
       return;
     }
 
-
     if (
       pendentes.length > 0
     ) {
@@ -1047,7 +1095,6 @@ export default function AlunoPage() {
       return;
     }
 
-
     const aprovadas =
       disciplinas.every(
         (disciplina) =>
@@ -1057,7 +1104,6 @@ export default function AlunoPage() {
             ),
           ),
       );
-
 
     if (!aprovadas) {
 
@@ -1072,27 +1118,19 @@ export default function AlunoPage() {
       return;
     }
 
-
     const numeroAtual =
       aluno.semestreAtual;
 
-
     const proximoNumero =
       numeroAtual + 1;
-
 
     const existemMaisSemestres =
       proximoNumero <=
       TOTAL_SEMESTRES;
 
-
     const novosSemestres =
       aluno.semestres.map(
         (semestre) => {
-
-          // ==================================================
-          // SEMESTRE ATUAL
-          // ==================================================
 
           if (
             semestre.numero ===
@@ -1143,11 +1181,6 @@ export default function AlunoPage() {
             };
           }
 
-
-          // ==================================================
-          // PRÓXIMO SEMESTRE
-          // ==================================================
-
           if (
             semestre.numero ===
             proximoNumero
@@ -1174,11 +1207,9 @@ export default function AlunoPage() {
             };
           }
 
-
           return semestre;
         },
       );
-
 
     const novoAluno: Aluno = {
 
@@ -1193,11 +1224,9 @@ export default function AlunoPage() {
         novosSemestres,
     };
 
-
     salvarAluno(
       novoAluno,
     );
-
 
     if (
       !existemMaisSemestres
@@ -1214,7 +1243,6 @@ export default function AlunoPage() {
       return;
     }
 
-
     setTipoMensagem(
       "sucesso",
     );
@@ -1224,12 +1252,128 @@ export default function AlunoPage() {
     );
   }
 
+  // ==========================================================
+  // ABRIR CONFIGURAÇÕES
+  // ==========================================================
+
+  function abrirConfiguracoes() {
+
+    setConfiguracoesEditadas(
+      configuracoes,
+    );
+
+    setMenuAberto(
+      false,
+    );
+
+    setConfiguracoesAbertas(
+      true,
+  );
+  }
+
+  // ==========================================================
+  // SALVAR CONFIGURAÇÕES
+  // ==========================================================
+
+  function salvarConfiguracoes() {
+
+    const novasConfiguracoes = {
+      ...configuracoesEditadas,
+    };
+
+    setConfiguracoes(
+      novasConfiguracoes,
+    );
+
+    try {
+
+      localStorage.setItem(
+        "pac_configuracoes_aluno",
+        JSON.stringify(
+          novasConfiguracoes,
+        ),
+      );
+
+      setConfiguracoesAbertas(
+        false,
+      );
+
+      setTipoMensagem(
+        "sucesso",
+      );
+
+      setMensagem(
+        "⚙️ Configurações salvas com sucesso.",
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Erro ao salvar configurações:",
+        error,
+      );
+
+      setTipoMensagem(
+        "erro",
+      );
+
+      setMensagem(
+        "Não foi possível salvar as configurações.",
+      );
+    }
+  }
+
+  // ==========================================================
+  // RESTAURAR CONFIGURAÇÕES
+  // ==========================================================
+
+  function restaurarConfiguracoes() {
+
+    const configuracoesPadrao = {
+      ...CONFIGURACOES_PADRAO,
+    };
+
+    setConfiguracoesEditadas(
+      configuracoesPadrao,
+    );
+  }
+
+  // ==========================================================
+  // ALTERAR CONFIGURAÇÃO
+  // ==========================================================
+
+  function alterarConfiguracao<K extends keyof ConfiguracoesAluno>(
+    chave: K,
+    valor: ConfiguracoesAluno[K],
+  ) {
+
+    setConfiguracoesEditadas(
+      (atual) => ({
+        ...atual,
+        [chave]: valor,
+      }),
+    );
+  }
 
   // ==========================================================
   // SAIR
   // ==========================================================
 
   function sair() {
+
+    if (
+      configuracoes.confirmarSaida
+    ) {
+
+      const confirmar =
+        window.confirm(
+          "Deseja realmente sair da área do aluno?",
+        );
+
+      if (!confirmar) {
+        return;
+      }
+    }
 
     localStorage.removeItem(
       "pac_sessao",
@@ -1239,6 +1383,20 @@ export default function AlunoPage() {
       "/login";
   }
 
+  // ==========================================================
+  // FECHAR CONFIGURAÇÕES
+  // ==========================================================
+
+  function fecharConfiguracoes() {
+
+    setConfiguracoesEditadas(
+      configuracoes,
+    );
+
+    setConfiguracoesAbertas(
+      false,
+    );
+  }
 
   // ==========================================================
   // LOADING
@@ -1268,14 +1426,21 @@ export default function AlunoPage() {
     );
   }
 
-
   // ==========================================================
   // RENDER
   // ==========================================================
 
   return (
 
-    <main className="pac-page">
+    <main
+      className={
+        `pac-page ${
+          configuracoes.densidade === "compacta"
+            ? "density-compact"
+            : ""
+        }`
+      }
+    >
 
       {/* ================================================== */}
       {/* TOPBAR */}
@@ -1303,7 +1468,6 @@ export default function AlunoPage() {
 
         </div>
 
-
         <div className="user-area">
 
           <button
@@ -1319,17 +1483,14 @@ export default function AlunoPage() {
 
             <span className="avatar">
 
-              {(
-                aluno.nomeCompleto ||
-                "A"
-              )
+              {nomeExibicao
                 .charAt(0)
                 .toUpperCase()}
 
             </span>
 
             <span className="user-name">
-              {aluno.nomeCompleto}
+              {nomeExibicao}
             </span>
 
             <span className="arrow">
@@ -1338,27 +1499,37 @@ export default function AlunoPage() {
 
           </button>
 
-
           {menuAberto && (
 
             <div className="user-menu">
 
               <button
                 type="button"
-                onClick={() =>
-                  setMenuAberto(
-                    false,
-                  )
+                onClick={() => {
+                  setMenuAberto(false);
+                  setTipoMensagem("info");
+                  setMensagem(
+                    `Usuário: ${aluno.usuario}`,
+                  );
+                }}
+              >
+                👤 Meu perfil
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  abrirConfiguracoes
                 }
               >
-                Meu perfil
+                ⚙️ Configurações
               </button>
 
               <button
                 type="button"
                 onClick={sair}
               >
-                Sair
+                🚪 Sair
               </button>
 
             </div>
@@ -1368,7 +1539,6 @@ export default function AlunoPage() {
         </div>
 
       </header>
-
 
       {/* ================================================== */}
       {/* CONTEÚDO */}
@@ -1389,7 +1559,7 @@ export default function AlunoPage() {
             </span>
 
             <h1>
-              Olá, {aluno.nomeCompleto}!
+              Olá, {nomeExibicao}!
             </h1>
 
             <p>
@@ -1398,7 +1568,6 @@ export default function AlunoPage() {
             </p>
 
           </div>
-
 
           <div className="semester-badge">
 
@@ -1413,7 +1582,6 @@ export default function AlunoPage() {
           </div>
 
         </div>
-
 
         {/* ================================================= */}
         {/* MENSAGEM */}
@@ -1445,7 +1613,6 @@ export default function AlunoPage() {
 
         )}
 
-
         {/* ================================================= */}
         {/* CARDS */}
         {/* ================================================= */}
@@ -1470,7 +1637,6 @@ export default function AlunoPage() {
 
           </div>
 
-
           <div className="card">
 
             <span>
@@ -1488,7 +1654,6 @@ export default function AlunoPage() {
 
           </div>
 
-
           <div className="card">
 
             <span>
@@ -1504,7 +1669,6 @@ export default function AlunoPage() {
             </small>
 
           </div>
-
 
           <div className="card">
 
@@ -1523,7 +1687,6 @@ export default function AlunoPage() {
           </div>
 
         </div>
-
 
         {/* ================================================= */}
         {/* PROGRESSO DO CURSO */}
@@ -1551,7 +1714,6 @@ export default function AlunoPage() {
 
           </div>
 
-
           <div className="progress">
 
             <div
@@ -1563,7 +1725,6 @@ export default function AlunoPage() {
             />
 
           </div>
-
 
           <div className="semester-road">
 
@@ -1577,7 +1738,6 @@ export default function AlunoPage() {
                 const numero =
                   index + 1;
 
-
                 const semestre =
                   aluno.semestres.find(
                     (item) =>
@@ -1585,11 +1745,9 @@ export default function AlunoPage() {
                       numero,
                   );
 
-
                 const concluido =
                   semestre?.finalizado ??
                   false;
-
 
                 const liberado =
                   semestre?.status ===
@@ -1600,7 +1758,6 @@ export default function AlunoPage() {
                     "FINALIZADO" ||
                   numero <=
                     aluno.semestreAtual;
-
 
                 return (
 
@@ -1640,7 +1797,6 @@ export default function AlunoPage() {
 
         </section>
 
-
         {/* ================================================= */}
         {/* ARQUIVOS */}
         {/* ================================================= */}
@@ -1666,13 +1822,11 @@ export default function AlunoPage() {
 
             </div>
 
-
             <div className="files-icon">
               📁
             </div>
 
           </div>
-
 
           <div className="file-uploader-container">
 
@@ -1681,7 +1835,6 @@ export default function AlunoPage() {
           </div>
 
         </section>
-
 
         {/* ================================================= */}
         {/* SEMESTRE ATUAL */}
@@ -1704,7 +1857,6 @@ export default function AlunoPage() {
                 </h2>
 
               </div>
-
 
               <div
                 className={
@@ -1731,7 +1883,6 @@ export default function AlunoPage() {
               </div>
 
             </div>
-
 
             {/* ================================================= */}
             {/* DISCIPLINAS */}
@@ -1764,16 +1915,13 @@ export default function AlunoPage() {
                         disciplina,
                       );
 
-
                     const disciplinaAprovada =
                       conceitoAprovado(
                         conceito,
                       );
 
-
                     const disciplinaReprovada =
                       conceito === "D";
-
 
                     return (
 
@@ -1809,13 +1957,11 @@ export default function AlunoPage() {
 
                         </div>
 
-
                         <div className="competencia-area">
 
                           <span>
                             COMPETÊNCIA
                           </span>
-
 
                           <div className="competencias">
 
@@ -1859,7 +2005,6 @@ export default function AlunoPage() {
 
                         </div>
 
-
                         <div
                           className={
                             `result ${
@@ -1888,7 +2033,6 @@ export default function AlunoPage() {
               )}
 
             </div>
-
 
             {/* ================================================= */}
             {/* FINALIZAÇÃO */}
@@ -1920,7 +2064,6 @@ export default function AlunoPage() {
                   </strong>.
                 </p>
 
-
                 <div className="finish-status">
 
                   <span
@@ -1944,7 +2087,6 @@ export default function AlunoPage() {
                 </div>
 
               </div>
-
 
               <button
                 type="button"
@@ -1971,7 +2113,6 @@ export default function AlunoPage() {
           </section>
         )}
 
-
         {/* ================================================= */}
         {/* SISTEMA DE AVALIAÇÃO */}
         {/* ================================================= */}
@@ -1994,7 +2135,6 @@ export default function AlunoPage() {
 
           </div>
 
-
           <div className="legend">
 
             {CONCEITOS.map(
@@ -2012,7 +2152,6 @@ export default function AlunoPage() {
                   >
                     {item}
                   </div>
-
 
                   <div>
 
@@ -2039,6 +2178,453 @@ export default function AlunoPage() {
 
       </section>
 
+      {/* ================================================== */}
+      {/* MODAL DE CONFIGURAÇÕES */}
+      {/* ================================================== */}
+
+      {configuracoesAbertas && (
+
+        <div
+          className="settings-overlay"
+          onMouseDown={(evento) => {
+
+            if (
+              evento.target ===
+              evento.currentTarget
+            ) {
+              fecharConfiguracoes();
+            }
+
+          }}
+        >
+
+          <section
+            className="settings-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="configuracoes-titulo"
+          >
+
+            <div className="settings-header">
+
+              <div className="settings-title-area">
+
+                <div className="settings-icon">
+                  ⚙️
+                </div>
+
+                <div>
+
+                  <span>
+                    P.A.C.
+                  </span>
+
+                  <h2 id="configuracoes-titulo">
+                    Configurações
+                  </h2>
+
+                  <p>
+                    Personalize sua área do estudante.
+                  </p>
+
+                </div>
+
+              </div>
+
+              <button
+                type="button"
+                className="settings-close"
+                aria-label="Fechar configurações"
+                onClick={
+                  fecharConfiguracoes
+                }
+              >
+                ×
+              </button>
+
+            </div>
+
+            <div className="settings-body">
+
+              {/* ================================================= */}
+              {/* PERFIL */}
+              {/* ================================================= */}
+
+              <div className="settings-section">
+
+                <div className="settings-section-title">
+
+                  <span>
+                    👤
+                  </span>
+
+                  <div>
+
+                    <strong>
+                      Perfil
+                    </strong>
+
+                    <small>
+                      Como seu nome será apresentado na plataforma.
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div className="settings-field">
+
+                  <label htmlFor="nome-exibicao">
+                    Nome de exibição
+                  </label>
+
+                  <input
+                    id="nome-exibicao"
+                    type="text"
+                    value={
+                      configuracoesEditadas.nomeExibicao
+                    }
+                    placeholder={
+                      aluno.nomeCompleto
+                    }
+                    onChange={(evento) =>
+                      alterarConfiguracao(
+                        "nomeExibicao",
+                        evento.target.value,
+                      )
+                    }
+                  />
+
+                  <small>
+                    Se deixar vazio, será utilizado seu nome cadastrado.
+                  </small>
+
+                </div>
+
+              </div>
+
+              {/* ================================================= */}
+              {/* NOTIFICAÇÕES */}
+              {/* ================================================= */}
+
+              <div className="settings-section">
+
+                <div className="settings-section-title">
+
+                  <span>
+                    🔔
+                  </span>
+
+                  <div>
+
+                    <strong>
+                      Notificações
+                    </strong>
+
+                    <small>
+                      Controle os avisos exibidos pela P.A.C.
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div className="settings-option">
+
+                  <div>
+
+                    <strong>
+                      Notificações da plataforma
+                    </strong>
+
+                    <span>
+                      Permitir mensagens e avisos importantes.
+                    </span>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    className={
+                      `switch ${
+                        configuracoesEditadas.notificacoes
+                          ? "on"
+                          : ""
+                      }`
+                    }
+                    aria-pressed={
+                      configuracoesEditadas.notificacoes
+                    }
+                    onClick={() =>
+                      alterarConfiguracao(
+                        "notificacoes",
+                        !configuracoesEditadas.notificacoes,
+                      )
+                    }
+                  >
+
+                    <span />
+
+                  </button>
+
+                </div>
+
+                <div className="settings-option">
+
+                  <div>
+
+                    <strong>
+                      Lembretes acadêmicos
+                    </strong>
+
+                    <span>
+                      Mostrar lembretes relacionados ao curso.
+                    </span>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    className={
+                      `switch ${
+                        configuracoesEditadas.lembretesAcademicos
+                          ? "on"
+                          : ""
+                      }`
+                    }
+                    aria-pressed={
+                      configuracoesEditadas.lembretesAcademicos
+                    }
+                    onClick={() =>
+                      alterarConfiguracao(
+                        "lembretesAcademicos",
+                        !configuracoesEditadas.lembretesAcademicos,
+                      )
+                    }
+                  >
+
+                    <span />
+
+                  </button>
+
+                </div>
+
+              </div>
+
+              {/* ================================================= */}
+              {/* COMPORTAMENTO */}
+              {/* ================================================= */}
+
+              <div className="settings-section">
+
+                <div className="settings-section-title">
+
+                  <span>
+                    🛠️
+                  </span>
+
+                  <div>
+
+                    <strong>
+                      Comportamento
+                    </strong>
+
+                    <small>
+                      Ajuste o comportamento da área do aluno.
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div className="settings-option">
+
+                  <div>
+
+                    <strong>
+                      Confirmar antes de sair
+                    </strong>
+
+                    <span>
+                      Exibir confirmação ao clicar em Sair.
+                    </span>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    className={
+                      `switch ${
+                        configuracoesEditadas.confirmarSaida
+                          ? "on"
+                          : ""
+                      }`
+                    }
+                    aria-pressed={
+                      configuracoesEditadas.confirmarSaida
+                    }
+                    onClick={() =>
+                      alterarConfiguracao(
+                        "confirmarSaida",
+                        !configuracoesEditadas.confirmarSaida,
+                      )
+                    }
+                  >
+
+                    <span />
+
+                  </button>
+
+                </div>
+
+              </div>
+
+              {/* ================================================= */}
+              {/* APARÊNCIA */}
+              {/* ================================================= */}
+
+              <div className="settings-section">
+
+                <div className="settings-section-title">
+
+                  <span>
+                    🖥️
+                  </span>
+
+                  <div>
+
+                    <strong>
+                      Aparência da interface
+                    </strong>
+
+                    <small>
+                      Escolha a densidade dos elementos da página.
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div className="density-options">
+
+                  <button
+                    type="button"
+                    className={
+                      configuracoesEditadas.densidade ===
+                      "normal"
+                        ? "density-option selected"
+                        : "density-option"
+                    }
+                    onClick={() =>
+                      alterarConfiguracao(
+                        "densidade",
+                        "normal",
+                      )
+                    }
+                  >
+
+                    <span className="density-preview normal-preview">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+
+                    <strong>
+                      Normal
+                    </strong>
+
+                    <small>
+                      Interface padrão
+                    </small>
+
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      configuracoesEditadas.densidade ===
+                      "compacta"
+                        ? "density-option selected"
+                        : "density-option"
+                    }
+                    onClick={() =>
+                      alterarConfiguracao(
+                        "densidade",
+                        "compacta",
+                      )
+                    }
+                  >
+
+                    <span className="density-preview compact-preview">
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+
+                    <strong>
+                      Compacta
+                    </strong>
+
+                    <small>
+                      Mais informações na tela
+                    </small>
+
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* ================================================= */}
+            {/* RODAPÉ CONFIGURAÇÕES */}
+            {/* ================================================= */}
+
+            <div className="settings-footer">
+
+              <button
+                type="button"
+                className="restore-button"
+                onClick={
+                  restaurarConfiguracoes
+                }
+              >
+                Restaurar padrão
+              </button>
+
+              <div className="settings-footer-actions">
+
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={
+                    fecharConfiguracoes
+                  }
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className="save-settings-button"
+                  onClick={
+                    salvarConfiguracoes
+                  }
+                >
+                  ✓ Salvar configurações
+                </button>
+
+              </div>
+
+            </div>
+
+          </section>
+
+        </div>
+
+      )}
 
       {/* ================================================== */}
       {/* CSS */}
@@ -2172,7 +2758,7 @@ export default function AlunoPage() {
           right: 0;
           top: 48px;
 
-          width: 180px;
+          width: 200px;
 
           background: #ffffff;
 
@@ -2205,6 +2791,9 @@ export default function AlunoPage() {
 
           color: #18252d;
           font-size: 13px;
+
+          transition:
+            background .15s ease;
         }
 
         .user-menu button:hover {
@@ -3043,6 +3632,662 @@ export default function AlunoPage() {
           font-size: 10px;
         }
 
+        /* ====================================================
+           CONFIGURAÇÕES
+           ==================================================== */
+
+        .settings-overlay {
+          position: fixed;
+
+          inset: 0;
+
+          z-index: 1000;
+
+          background:
+            rgba(16,31,38,.52);
+
+          backdrop-filter:
+            blur(4px);
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          padding: 20px;
+
+          animation:
+            settingsFadeIn .18s ease;
+        }
+
+        @keyframes settingsFadeIn {
+          from {
+            opacity: 0;
+          }
+
+          to {
+            opacity: 1;
+          }
+        }
+
+        .settings-modal {
+          width:
+            min(
+              650px,
+              100%
+            );
+
+          max-height:
+            min(
+              820px,
+              calc(100vh - 40px)
+            );
+
+          background: #ffffff;
+
+          border-radius: 18px;
+
+          border:
+            1px solid #dce4e8;
+
+          box-shadow:
+            0 25px 70px
+            rgba(0,0,0,.20);
+
+          display: flex;
+
+          flex-direction: column;
+
+          overflow: hidden;
+
+          animation:
+            settingsModalIn .2s ease;
+        }
+
+        @keyframes settingsModalIn {
+          from {
+            opacity: 0;
+            transform:
+              translateY(12px)
+              scale(.98);
+          }
+
+          to {
+            opacity: 1;
+            transform:
+              translateY(0)
+              scale(1);
+          }
+        }
+
+        .settings-header {
+          padding:
+            20px 22px;
+
+          border-bottom:
+            1px solid #e4eaed;
+
+          display: flex;
+
+          align-items: flex-start;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
+
+          flex-shrink: 0;
+        }
+
+        .settings-title-area {
+          display: flex;
+
+          align-items: center;
+
+          gap: 13px;
+        }
+
+        .settings-icon {
+          width: 46px;
+          height: 46px;
+
+          border-radius: 12px;
+
+          background: #e5f6ee;
+
+          color: #087f5b;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          font-size: 21px;
+        }
+
+        .settings-title-area span {
+          color: #087f5b;
+
+          font-size: 10px;
+
+          font-weight: 900;
+
+          letter-spacing: 1px;
+        }
+
+        .settings-title-area h2 {
+          margin:
+            3px 0;
+
+          font-size: 21px;
+
+          color: #18252d;
+        }
+
+        .settings-title-area p {
+          margin: 0;
+
+          color: #7a8991;
+
+          font-size: 12px;
+        }
+
+        .settings-close {
+          width: 34px;
+          height: 34px;
+
+          border: 0;
+
+          background: #f3f6f7;
+
+          color: #68777f;
+
+          border-radius: 8px;
+
+          cursor: pointer;
+
+          font-size: 23px;
+
+          line-height: 1;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          transition:
+            background .15s ease;
+        }
+
+        .settings-close:hover {
+          background: #e8edef;
+
+          color: #18252d;
+        }
+
+        .settings-body {
+          overflow-y: auto;
+
+          padding:
+            5px 22px 18px;
+        }
+
+        .settings-section {
+          padding:
+            19px 0;
+
+          border-bottom:
+            1px solid #edf1f2;
+        }
+
+        .settings-section:last-child {
+          border-bottom: 0;
+        }
+
+        .settings-section-title {
+          display: flex;
+
+          align-items: flex-start;
+
+          gap: 11px;
+
+          margin-bottom: 15px;
+        }
+
+        .settings-section-title > span {
+          width: 32px;
+          height: 32px;
+
+          flex-shrink: 0;
+
+          border-radius: 8px;
+
+          background: #f0f5f3;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          font-size: 15px;
+        }
+
+        .settings-section-title strong {
+          display: block;
+
+          font-size: 13px;
+
+          color: #18252d;
+        }
+
+        .settings-section-title small {
+          display: block;
+
+          margin-top: 3px;
+
+          color: #849199;
+
+          font-size: 11px;
+
+          line-height: 1.4;
+        }
+
+        .settings-field {
+          padding-left: 43px;
+        }
+
+        .settings-field label {
+          display: block;
+
+          margin-bottom: 7px;
+
+          color: #35454d;
+
+          font-size: 11px;
+
+          font-weight: 900;
+        }
+
+        .settings-field input {
+          width: 100%;
+
+          height: 42px;
+
+          border:
+            1px solid #d5dfe3;
+
+          border-radius: 9px;
+
+          padding:
+            0 12px;
+
+          outline: none;
+
+          background: #ffffff;
+
+          color: #18252d;
+
+          font-size: 13px;
+
+          transition:
+            border-color .15s ease,
+            box-shadow .15s ease;
+        }
+
+        .settings-field input:focus {
+          border-color: #087f5b;
+
+          box-shadow:
+            0 0 0 3px
+            rgba(8,127,91,.08);
+        }
+
+        .settings-field > small {
+          display: block;
+
+          margin-top: 6px;
+
+          color: #8a969c;
+
+          font-size: 10px;
+        }
+
+        .settings-option {
+          margin-left: 43px;
+
+          padding:
+            12px 0;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 20px;
+
+          border-top:
+            1px solid #f0f3f4;
+        }
+
+        .settings-option:first-of-type {
+          border-top: 0;
+        }
+
+        .settings-option strong {
+          display: block;
+
+          color: #35454d;
+
+          font-size: 12px;
+        }
+
+        .settings-option div span {
+          display: block;
+
+          margin-top: 3px;
+
+          color: #89969d;
+
+          font-size: 10px;
+        }
+
+        .switch {
+          position: relative;
+
+          width: 44px;
+          height: 24px;
+
+          flex-shrink: 0;
+
+          border: 0;
+
+          border-radius: 20px;
+
+          background: #cdd7db;
+
+          padding: 0;
+
+          cursor: pointer;
+
+          transition:
+            background .2s ease;
+        }
+
+        .switch span {
+          position: absolute;
+
+          width: 18px;
+          height: 18px;
+
+          top: 3px;
+          left: 3px;
+
+          border-radius: 50%;
+
+          background: #ffffff;
+
+          box-shadow:
+            0 2px 5px
+            rgba(0,0,0,.18);
+
+          transition:
+            transform .2s ease;
+        }
+
+        .switch.on {
+          background: #087f5b;
+        }
+
+        .switch.on span {
+          transform:
+            translateX(20px);
+        }
+
+        .density-options {
+          margin-left: 43px;
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(2, 1fr);
+
+          gap: 10px;
+        }
+
+        .density-option {
+          border:
+            1px solid #dce4e8;
+
+          background: #ffffff;
+
+          border-radius: 10px;
+
+          padding: 13px;
+
+          text-align: left;
+
+          cursor: pointer;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 4px;
+
+          transition:
+            border-color .15s ease,
+            background .15s ease,
+            box-shadow .15s ease;
+        }
+
+        .density-option:hover {
+          border-color: #a9c9bc;
+        }
+
+        .density-option.selected {
+          border-color: #087f5b;
+
+          background: #f3faf7;
+
+          box-shadow:
+            0 0 0 2px
+            rgba(8,127,91,.07);
+        }
+
+        .density-option strong {
+          color: #34444c;
+
+          font-size: 12px;
+        }
+
+        .density-option small {
+          color: #89969d;
+
+          font-size: 10px;
+        }
+
+        .density-preview {
+          width: 100%;
+
+          height: 42px;
+
+          padding: 6px;
+
+          border-radius: 6px;
+
+          background: #edf2f3;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 3px;
+
+          margin-bottom: 5px;
+        }
+
+        .density-preview i {
+          display: block;
+
+          height: 6px;
+
+          border-radius: 3px;
+
+          background: #a9bbb4;
+        }
+
+        .normal-preview i {
+          margin-bottom: 3px;
+        }
+
+        .compact-preview {
+          gap: 2px;
+        }
+
+        .compact-preview i {
+          height: 4px;
+        }
+
+        .settings-footer {
+          padding:
+            15px 22px;
+
+          border-top:
+            1px solid #e4eaed;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
+
+          background: #fbfcfc;
+
+          flex-shrink: 0;
+        }
+
+        .restore-button {
+          border: 0;
+
+          background: transparent;
+
+          color: #71808a;
+
+          font-size: 11px;
+
+          font-weight: 800;
+
+          cursor: pointer;
+
+          padding: 8px 0;
+        }
+
+        .restore-button:hover {
+          color: #087f5b;
+
+          text-decoration:
+            underline;
+        }
+
+        .settings-footer-actions {
+          display: flex;
+
+          align-items: center;
+
+          gap: 8px;
+        }
+
+        .cancel-button {
+          border:
+            1px solid #d5dfe3;
+
+          background: #ffffff;
+
+          color: #4d5c63;
+
+          padding:
+            10px 14px;
+
+          border-radius: 8px;
+
+          cursor: pointer;
+
+          font-size: 11px;
+
+          font-weight: 800;
+        }
+
+        .cancel-button:hover {
+          background: #f2f5f6;
+        }
+
+        .save-settings-button {
+          border: 0;
+
+          background: #087f5b;
+
+          color: #ffffff;
+
+          padding:
+            10px 15px;
+
+          border-radius: 8px;
+
+          cursor: pointer;
+
+          font-size: 11px;
+
+          font-weight: 900;
+
+          box-shadow:
+            0 4px 10px
+            rgba(8,127,91,.15);
+
+          transition:
+            background .15s ease,
+            transform .15s ease;
+        }
+
+        .save-settings-button:hover {
+          background: #066b4d;
+
+          transform:
+            translateY(-1px);
+        }
+
+        /* ====================================================
+           DENSIDADE COMPACTA
+           ==================================================== */
+
+        .density-compact .panel {
+          padding: 18px;
+        }
+
+        .density-compact .card {
+          padding: 15px;
+        }
+
+        .density-compact .discipline {
+          padding: 12px;
+        }
+
+        .density-compact .content {
+          padding-top: 27px;
+        }
+
+        .density-compact .cards {
+          gap: 12px;
+        }
+
         .loading {
           min-height: 100vh;
 
@@ -3127,6 +4372,7 @@ export default function AlunoPage() {
                 1fr
               );
           }
+
         }
 
         @media (max-width: 600px) {
@@ -3267,6 +4513,77 @@ export default function AlunoPage() {
           .files-icon {
             display: none;
           }
+
+          /* CONFIGURAÇÕES MOBILE */
+
+          .settings-overlay {
+            padding: 10px;
+          }
+
+          .settings-modal {
+            max-height:
+              calc(100vh - 20px);
+
+            border-radius: 14px;
+          }
+
+          .settings-header {
+            padding:
+              16px;
+          }
+
+          .settings-body {
+            padding:
+              0 16px 12px;
+          }
+
+          .settings-section {
+            padding:
+              16px 0;
+          }
+
+          .settings-field,
+          .settings-option,
+          .density-options {
+            margin-left: 0;
+
+            padding-left: 0;
+          }
+
+          .settings-option {
+            gap: 12px;
+          }
+
+          .density-options {
+            grid-template-columns:
+              1fr;
+          }
+
+          .settings-footer {
+            padding:
+              12px 16px;
+
+            flex-direction:
+              column;
+
+            align-items:
+              stretch;
+          }
+
+          .settings-footer-actions {
+            width: 100%;
+          }
+
+          .cancel-button,
+          .save-settings-button {
+            flex: 1;
+          }
+
+          .restore-button {
+            align-self:
+              flex-start;
+          }
+
         }
 
       `}</style>
